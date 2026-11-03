@@ -18,6 +18,7 @@ class TelnyxClient:
         from_number: str = settings.telnyx_from_number,
         connection_id: str = settings.telnyx_connection_id,
         webhook_url: str | None = None,
+        client_state: str | None = None,
     ) -> Dict[str, Any]:
         """Initiate an outbound call to a landline/PSTN or SIP endpoint."""
         payload: Dict[str, Any] = {
@@ -27,6 +28,8 @@ class TelnyxClient:
         }
         if webhook_url:
             payload["webhook_url"] = webhook_url
+        if client_state:
+            payload["client_state"] = client_state
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -38,13 +41,23 @@ class TelnyxClient:
             response.raise_for_status()
             return response.json()
 
-    async def speak(self, call_control_id: str, payload_text: str, voice: str = "female", language: str = "en-US") -> Dict[str, Any]:
+    async def speak(
+        self,
+        call_control_id: str,
+        payload_text: str,
+        voice: str = "female",
+        language: str = "sv-SE",
+        client_state: str | None = None,
+    ) -> Dict[str, Any]:
         """Instruct Telnyx Call Control to speak text on an active call."""
-        body = {
+        body: Dict[str, Any] = {
             "payload": payload_text,
             "voice": voice,
             "language": language,
         }
+        if client_state:
+            body["client_state"] = client_state
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.base_url}/calls/{call_control_id}/actions/speak",
