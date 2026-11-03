@@ -18,3 +18,22 @@ async def test_get_call_not_found():
         resp = await client.get("/calls/nonexistent_id")
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Call not found"
+
+
+@pytest.mark.asyncio
+async def test_docs_and_openapi_endpoints():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Swagger UI docs endpoint
+        resp_docs = await client.get("/docs")
+        assert resp_docs.status_code == 200
+        assert "swagger-ui" in resp_docs.text
+
+        # Redoc alternative docs endpoint
+        resp_redoc = await client.get("/redoc")
+        assert resp_redoc.status_code == 200
+        assert "redoc" in resp_redoc.text
+
+        # OpenAPI schema JSON endpoint
+        resp_openapi = await client.get("/openapi.json")
+        assert resp_openapi.status_code == 200
+        assert resp_openapi.json()["info"]["title"] == "Claude Call - Fröken Ur & Telnyx"

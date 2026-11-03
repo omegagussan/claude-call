@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi
 
 test:
 	uv run pytest
@@ -40,3 +40,6 @@ run:
 
 simulate:
 	uv run python tests/integration/test_telnyx_client_simulation.py
+
+openapi generate-openapi:
+	uv run python scripts/generate_openapi.py
