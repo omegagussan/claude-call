@@ -72,6 +72,36 @@ class TelnyxClient:
             res_data: dict[str, Any] = response.json()
             return res_data
 
+    async def gather_using_speak(
+        self,
+        call_control_id: str,
+        payload_text: str,
+        voice: str = "female",
+        language: str = "en-US",
+        timeout_millis: int = 5000,
+        client_state: str | None = None,
+    ) -> dict[str, Any]:
+        """Play a prompt and gather user input (e.g. speech / DTMF)."""
+        body: dict[str, Any] = {
+            "payload": payload_text,
+            "voice": voice,
+            "language": language,
+            "timeout_millis": timeout_millis,
+        }
+        if client_state:
+            body["client_state"] = client_state
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/calls/{call_control_id}/actions/gather_using_speak",
+                headers=self.headers,
+                json=body,
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            res_data: dict[str, Any] = response.json()
+            return res_data
+
     async def hangup(self, call_control_id: str) -> dict[str, Any]:
         """Hang up a call."""
         async with httpx.AsyncClient() as client:
