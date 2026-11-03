@@ -1,7 +1,9 @@
-from typing import Any, Dict
+from typing import Any
 
 
-def build_telnyx_event(event_type: str, call_control_id: str, to: str = "+15559876543", from_: str = "+15551234567", **extra_payload) -> Dict[str, Any]:
+def build_telnyx_event(
+    event_type: str, call_control_id: str, to: str = "+15559876543", from_: str = "+15551234567", **extra_payload
+) -> dict[str, Any]:
     """Helper to generate realistic Telnyx webhook payloads."""
     payload = {
         "call_control_id": call_control_id,

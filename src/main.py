@@ -1,15 +1,17 @@
 import asyncio
 import base64
-from typing import Any, Dict
+from typing import Any
+
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
-from telnyx_client import telnyx_client
-from services.time_service import format_froken_ur_speech
+
+from src.services.time_service import format_froken_ur_speech
+from src.telnyx_client import telnyx_client
 
 app = FastAPI(title="Claude Call - Fröken Ur & Telnyx")
 
 # In-memory tracking for call state
-active_calls: Dict[str, Dict[str, Any]] = {}
+active_calls: dict[str, dict[str, Any]] = {}
 
 
 class CallRequest(BaseModel):
@@ -34,7 +36,7 @@ async def root():
 async def make_call(request: CallRequest):
     """Trigger a generic outbound call to a landline via Telnyx."""
     try:
-        kwargs: Dict[str, Any] = {"to_number": request.to_number}
+        kwargs: dict[str, Any] = {"to_number": request.to_number}
         if request.from_number:
             kwargs["from_number"] = request.from_number
         if request.webhook_url:
@@ -58,7 +60,7 @@ async def make_call(request: CallRequest):
             "call_leg_id": data.get("call_leg_id"),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/calls/froken-ur", status_code=status.HTTP_201_CREATED)
@@ -69,7 +71,7 @@ async def start_froken_ur(request: FrokenUrRequest):
     """
     try:
         client_state_str = base64.b64encode(b"froken_ur").decode("utf-8")
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "to_number": request.to_number,
             "client_state": client_state_str,
         }
@@ -100,11 +102,11 @@ async def start_froken_ur(request: FrokenUrRequest):
             "call_leg_id": data.get("call_leg_id"),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/webhooks/telnyx")
-async def telnyx_webhook(event: Dict[str, Any]):
+async def telnyx_webhook(event: dict[str, Any]):
     """Handle incoming call control webhooks from Telnyx."""
     event_data = event.get("data", {})
     event_type = event_data.get("event_type")

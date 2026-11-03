@@ -1,10 +1,11 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
 from src.services.time_service import (
+    calculate_next_schedule_delay,
+    estimate_speech_duration_seconds,
     format_froken_ur_speech,
     get_stockholm_time,
-    estimate_speech_duration_seconds,
-    calculate_next_schedule_delay,
 )
 
 

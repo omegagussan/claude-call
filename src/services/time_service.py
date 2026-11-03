@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import Tuple
 
 STOCKHOLM_TZ = ZoneInfo("Europe/Stockholm")
 
@@ -41,7 +40,7 @@ def estimate_speech_duration_seconds(text: str, wpm: float = SWEDISH_TTS_WORDS_P
 def format_froken_ur_speech(
     target_time: datetime | None = None,
     lead_time_seconds: float | None = None,
-) -> Tuple[str, float]:
+) -> tuple[str, float]:
     """
     Formats the Fröken Ur announcement for Stockholm time.
 

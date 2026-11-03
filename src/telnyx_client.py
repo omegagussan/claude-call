@@ -1,6 +1,8 @@
-from typing import Any, Dict
+from typing import Any
+
 import httpx
-from config import settings
+
+from src.config import settings
 
 
 class TelnyxClient:
@@ -19,9 +21,9 @@ class TelnyxClient:
         connection_id: str = settings.telnyx_connection_id,
         webhook_url: str | None = None,
         client_state: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Initiate an outbound call to a landline/PSTN or SIP endpoint."""
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "to": to_number,
             "from": from_number,
             "connection_id": connection_id,
@@ -39,7 +41,8 @@ class TelnyxClient:
                 timeout=10.0,
             )
             response.raise_for_status()
-            return response.json()
+            res_data: dict[str, Any] = response.json()
+            return res_data
 
     async def speak(
         self,
@@ -48,9 +51,9 @@ class TelnyxClient:
         voice: str = "female",
         language: str = "sv-SE",
         client_state: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Instruct Telnyx Call Control to speak text on an active call."""
-        body: Dict[str, Any] = {
+        body: dict[str, Any] = {
             "payload": payload_text,
             "voice": voice,
             "language": language,
@@ -66,9 +69,10 @@ class TelnyxClient:
                 timeout=10.0,
             )
             response.raise_for_status()
-            return response.json()
+            res_data: dict[str, Any] = response.json()
+            return res_data
 
-    async def hangup(self, call_control_id: str) -> Dict[str, Any]:
+    async def hangup(self, call_control_id: str) -> dict[str, Any]:
         """Hang up a call."""
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -78,7 +82,8 @@ class TelnyxClient:
                 timeout=10.0,
             )
             response.raise_for_status()
-            return response.json()
+            res_data: dict[str, Any] = response.json()
+            return res_data
 
 
 telnyx_client = TelnyxClient()

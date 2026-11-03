@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-v run simulate
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install
 
 test:
 	uv run pytest
@@ -11,6 +11,29 @@ test-integration:
 
 test-v:
 	uv run pytest -v
+
+typecheck:
+	uv run mypy src tests
+
+lint:
+	uv run ruff check .
+
+lint-fix:
+	uv run ruff check --fix .
+
+format:
+	uv run ruff format .
+
+check: lint format-check typecheck test
+
+format-check:
+	uv run ruff format --check .
+
+pre-commit-install:
+	uv run pre-commit install
+
+pre-commit:
+	uv run pre-commit run --all-files
 
 run:
 	uv run uvicorn src.main:app --reload

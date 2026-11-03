@@ -1,8 +1,8 @@
 import pytest
-from httpx import ASGITransport, AsyncClient
 import respx
-import httpx
-from main import app, active_calls
+from httpx import ASGITransport, AsyncClient
+
+from src.main import active_calls, app
 from tests.mock_telnyx import build_telnyx_event
 
 MOCK_BASE_URL = "https://api.telnyx.com/v2"

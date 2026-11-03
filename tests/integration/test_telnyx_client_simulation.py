@@ -1,7 +1,9 @@
 """Local CLI dry-run simulator for Telnyx calls without needing public webhooks or live credit."""
 
 import asyncio
+
 import httpx
+
 from tests.mock_telnyx import build_telnyx_event
 
 BASE_URL = "http://127.0.0.1:8000"
