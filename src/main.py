@@ -44,6 +44,12 @@ async def root():
     return {"message": "Claude Call Service"}
 
 
+@app.get("/health")
+async def health():
+    """Health check endpoint for container probes and load balancers."""
+    return {"status": "healthy", "version": app.version}
+
+
 @app.get("/todos/{phone_number}")
 async def get_user_todos(phone_number: str):
     """Retrieve current todo/shopping list items for a phone number."""
@@ -333,22 +339,28 @@ async def telnyx_webhook(event: dict[str, Any]):
             if call_state.get("status") != "completed":
                 call_state["status"] = "looping"
                 pause = call_state.get("pause_seconds", 3.0)
-                if pause > 0:
-                    await asyncio.sleep(pause)
 
-                if call_state.get("status") != "completed":
-                    speech_text, est_duration = format_froken_ur_speech()
-                    call_state["time_announcements_count"] = call_state.get("time_announcements_count", 0) + 1
-                    call_state["last_estimated_duration"] = est_duration
-                    call_state.setdefault("history", []).append(
-                        {"text": speech_text, "estimated_duration": est_duration}
-                    )
-                    await telnyx_client.speak(
-                        call_control_id=call_control_id,
-                        payload_text=speech_text,
-                        language="sv-SE",
-                        voice="female",
-                    )
+                async def _delayed_next_announcement(cid: str, wait_secs: float) -> None:
+                    if wait_secs > 0:
+                        await asyncio.sleep(wait_secs)
+                    st = active_calls.get(cid)
+                    if st and st.get("status") != "completed":
+                        speech_text, est_duration = format_froken_ur_speech()
+                        st["time_announcements_count"] = st.get("time_announcements_count", 0) + 1
+                        st["last_estimated_duration"] = est_duration
+                        st.setdefault("history", []).append({"text": speech_text, "estimated_duration": est_duration})
+                        await telnyx_client.speak(
+                            call_control_id=cid,
+                            payload_text=speech_text,
+                            language="sv-SE",
+                            voice="female",
+                        )
+
+                # If wait_secs is 0 (e.g. test environment), run synchronously; otherwise schedule non-blocking task
+                if pause == 0:
+                    await _delayed_next_announcement(call_control_id, 0.0)
+                else:
+                    asyncio.create_task(_delayed_next_announcement(call_control_id, pause))
         elif call_type == "generic":
             call_state["status"] = "message_completed"
             await telnyx_client.hangup(call_control_id=call_control_id)

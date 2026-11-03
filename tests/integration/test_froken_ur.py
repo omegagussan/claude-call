@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 import respx
 from httpx import ASGITransport, AsyncClient
@@ -144,3 +146,62 @@ async def test_froken_ur_repeats_at_least_twice_during_call():
         final_status = (await client.get(f"/calls/{call_control_id}")).json()
         assert final_status["status"] == "completed"
         assert final_status["time_announcements_count"] >= 2
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_concurrent_health_checks_during_active_froken_ur_call():
+    """
+    Simulates a single worker event loop processing an active Fröken Ur call (with a real pause)
+    and verifies that concurrent /health probes respond instantly (<50ms) without waiting
+    for the call's pause or speak steps to complete.
+    """
+    call_control_id = "v3:concurrent-froken-health"
+    user_phone = "+46800112233"
+
+    respx.post(f"{MOCK_BASE_URL}/calls").respond(
+        status_code=200,
+        json={"data": {"call_control_id": call_control_id, "record_type": "call"}},
+    )
+    respx.post(f"{MOCK_BASE_URL}/calls/{call_control_id}/actions/speak").respond(
+        status_code=200,
+        json={"data": {"result": "ok"}},
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Start Fröken Ur with a 1.0s pause between repetitions
+        dial_resp = await client.post("/calls/froken-ur", json={"to_number": user_phone, "pause_seconds": 1.0})
+        assert dial_resp.status_code == 201
+
+        # User answers the call (1st speech trigger)
+        await client.post(
+            "/webhooks/telnyx",
+            json=build_telnyx_event("call.answered", call_control_id, to=user_phone),
+        )
+
+        # First speak finishes -> triggers 1.0s background pause task
+        await client.post(
+            "/webhooks/telnyx",
+            json=build_telnyx_event("call.speak.ended", call_control_id, to=user_phone),
+        )
+
+        # Call state should be in 'looping' state while the 1.0s pause ticks
+        assert active_calls[call_control_id]["status"] == "looping"
+
+        # Concurrently fire multiple /health requests on the same single event loop
+        # They must execute immediately and return 200 without waiting for the 1.0s pause
+        health_responses = await asyncio.gather(
+            client.get("/health"),
+            client.get("/health"),
+            client.get("/health"),
+            client.get("/health"),
+            client.get("/health"),
+        )
+
+        for resp in health_responses:
+            assert resp.status_code == 200
+            assert resp.json() == {"status": "healthy", "version": app.version}
+
+        # Wait for the 1.0s pause to complete and trigger the second speech
+        await asyncio.sleep(1.1)
+        assert active_calls[call_control_id]["time_announcements_count"] >= 2
