@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi up down test-migrate
 
 test:
 	uv run pytest
@@ -52,3 +52,15 @@ docker-build:
 
 docker-run:
 	docker run -p 8000:8000 --rm claude-call:latest
+
+## Docker Compose targets
+
+up:
+	docker compose up --build -d
+
+down:
+	docker compose down -v
+
+test-migrate:
+	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from migrate
+	docker compose -f docker-compose.test.yml down -v

@@ -41,7 +41,9 @@ class WebhookRouter:
         """Retrieve handler for call type, defaulting to GenericCallback."""
         return self._handlers.get(call_type, self._handlers["generic"])
 
-    async def dispatch(self, event_type: str, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]) -> None:
+    async def dispatch(
+        self, event_type: str, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]
+    ) -> None:
         """Dispatch event to handler method based on event_type."""
         call_type = call_state.get("type", "generic")
         handler = self.get_handler(call_type)
