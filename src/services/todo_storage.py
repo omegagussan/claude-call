@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any
 
+from src.config import Settings, settings
+from src.services.migrator import DatabaseMigrator
+
 
 class TodoStorage(ABC):
     """Abstract interface for Todo storage backends."""
@@ -54,38 +57,46 @@ class InMemoryTodoStorage(TodoStorage):
 
 class PostgresTodoStorage(TodoStorage):
     """
-    Production-ready storage implementation that talks to a PostgreSQL database connection/session.
-    Can be injected with any DB connection or cursor-compatible engine (e.g. asyncpg/psycopg/SQLAlchemy).
-
-    Schema expected:
-        CREATE TABLE IF NOT EXISTS user_todos (
-            id SERIAL PRIMARY KEY,
-            phone_number VARCHAR(32) NOT NULL,
-            item TEXT NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-        CREATE INDEX IF NOT EXISTS idx_user_todos_phone ON user_todos(phone_number, id);
+    Production storage implementation backed by PostgreSQL.
+    Features dynamic table/schema configuration and auto-migration on start.
     """
 
-    def __init__(self, db_client: Any = None) -> None:
+    def __init__(
+        self,
+        db_client: Any = None,
+        app_settings: Settings = settings,
+        auto_migrate: bool | None = None,
+    ) -> None:
         self.db = db_client
+        self.settings = app_settings
+        self.table_ref = f"{self.settings.todo_db_schema}.{self.settings.todo_table_name}"
+        self.migrator = DatabaseMigrator(db_client=self.db, app_settings=self.settings) if self.db else None
+
+        should_migrate = auto_migrate if auto_migrate is not None else self.settings.auto_apply_migrations
+        if self.db and should_migrate and self.migrator:
+            self.migrate()
+
+    def migrate(self) -> list[str]:
+        """Apply pending migrations."""
+        if not self.migrator:
+            return []
+        return self.migrator.apply_pending_migrations()
 
     def push(self, phone_number: str, item: str) -> list[str]:
         clean_item = item.strip()
         if not clean_item:
             return self.list_items(phone_number)
 
-        # Uses database client if provided
-        query = "INSERT INTO user_todos (phone_number, item) VALUES (%s, %s);"
+        query = f"INSERT INTO {self.table_ref} (phone_number, item) VALUES (%s, %s);"
         self.db.execute(query, (phone_number, clean_item))
         return self.list_items(phone_number)
 
     def pop(self, phone_number: str) -> str | None:
         # Atomic FIFO pop using CTE: DELETE the oldest record and RETURNING the item
-        query = """
-            DELETE FROM user_todos
+        query = f"""
+            DELETE FROM {self.table_ref}
             WHERE id = (
-                SELECT id FROM user_todos
+                SELECT id FROM {self.table_ref}
                 WHERE phone_number = %s
                 ORDER BY id ASC
                 LIMIT 1
@@ -99,7 +110,7 @@ class PostgresTodoStorage(TodoStorage):
         return None
 
     def list_items(self, phone_number: str) -> list[str]:
-        query = "SELECT item FROM user_todos WHERE phone_number = %s ORDER BY id ASC;"
+        query = f"SELECT item FROM {self.table_ref} WHERE phone_number = %s ORDER BY id ASC;"
         rows = self.db.fetchall(query, (phone_number,))
         items: list[str] = []
         if rows:
@@ -109,5 +120,5 @@ class PostgresTodoStorage(TodoStorage):
         return items
 
     def clear(self, phone_number: str) -> None:
-        query = "DELETE FROM user_todos WHERE phone_number = %s;"
+        query = f"DELETE FROM {self.table_ref} WHERE phone_number = %s;"
         self.db.execute(query, (phone_number,))
