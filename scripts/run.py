@@ -6,6 +6,7 @@ Use this instead of the raw `uvicorn` CLI so log_config is applied correctly.
   Dev:   uv run python scripts/run.py --reload
   Prod:  CMD ["python", "scripts/run.py"]   (in Dockerfile)
 """
+
 import sys
 
 import uvicorn
