@@ -20,9 +20,9 @@ log_config = {
         },
     },
     "loggers": {
-        "uvicorn":        {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.error":  {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.access": {"handlers": ["access"],  "level": "INFO", "propagate": False},
-        "src":            {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+        "src": {"handlers": ["default"], "level": "INFO", "propagate": False},
     },
 }
