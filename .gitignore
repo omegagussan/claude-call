@@ -157,6 +157,10 @@ activemq-data/
 .dev.vars.*
 .envrc
 .venv
+.venv-workers/
+python_modules/
+.wrangler/
+pylock.toml
 env/
 venv/
 ENV/

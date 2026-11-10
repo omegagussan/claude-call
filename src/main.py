@@ -11,10 +11,11 @@ from src.services.todo_storage import D1TodoStorage
 from src.telnyx_client import telnyx_client
 from src.version import __version__
 
+asgi_worker: Any = None
 try:
-    from workers import asgi  # Cloudflare Workers Python runtime
+    from workers import asgi as asgi_worker  # Cloudflare Workers Python runtime
 except ImportError:
-    asgi = None
+    pass
 
 app = FastAPI(
     title="Claude Call - Fröken Ur & Telnyx",
@@ -239,4 +240,4 @@ async def get_call_status(call_control_id: str):
 
 
 # Expose to Cloudflare Worker runtime when running under Pyodide / Python Workers
-Default = asgi.entrypoint(app) if asgi is not None else app
+Default = asgi_worker.entrypoint(app) if asgi_worker is not None else app

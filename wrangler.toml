@@ -3,7 +3,11 @@ main = "src/main.py"
 compatibility_flags = ["python_workers"]
 compatibility_date = "2026-11-10"
 
+[build]
+command = "uvx --from workers-py pywrangler sync"
+
 [[d1_databases]]
 binding = "DB" # The namespace injected into the ASGI scope
 database_name = "claude_call_db"
 database_id = "7eb8c9df-c768-42c9-b7af-7f5aaa7a8821"
+
