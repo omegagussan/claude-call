@@ -4,7 +4,7 @@ Production/dev entrypoint that wires the JSON log config into uvicorn.run().
 Use this instead of the raw `uvicorn` CLI so log_config is applied correctly.
 
   Dev:   uv run python scripts/run.py --reload
-  Prod:  CMD ["python", "scripts/run.py"]   (in Dockerfile)
+  Local: uv run python scripts/run.py
 """
 
 import sys

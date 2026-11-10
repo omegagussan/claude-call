@@ -31,7 +31,7 @@ class DatabaseMigrator:
     def get_applied_versions(self) -> set[str]:
         self._ensure_migration_table()
         query = "SELECT version FROM _schema_migrations;"
-        rows = self.db.fetchall(query)
+        rows = self.db.execute(query).fetchall()
         if not rows:
             return set()
         return {r[0] if isinstance(r, (tuple, list)) else r.get("version") for r in rows}
@@ -54,13 +54,14 @@ class DatabaseMigrator:
                 sql_raw = file.read_text(encoding="utf-8")
                 sql = self.render_sql(sql_raw)
 
-                # Execute individual statements separated by semicolon
-                statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
-                for statement in statements:
-                    self.db.execute(statement)
+                with self.db:
+                    self.db.execute("BEGIN")
+                    statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+                    for statement in statements:
+                        self.db.execute(statement)
 
-                record_query = "INSERT INTO _schema_migrations (version) VALUES (?);"
-                self.db.execute(record_query, (version,))
+                    record_query = "INSERT INTO _schema_migrations (version) VALUES (?);"
+                    self.db.execute(record_query, (version,))
                 applied_now.append(version)
 
         return applied_now

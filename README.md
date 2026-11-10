@@ -12,7 +12,7 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
   - If the user is silent for the first 5 seconds, the options are announced automatically.
 - **Pluggable Storage & Raw SQL Migrations**:
   - `InMemoryTodoStorage` for local development, tests, and dry-runs.
-  - `PostgresTodoStorage` with an embedded raw SQL migrator (`src/migrations/`) that creates schemas, tables, indexes, and grants permissions dynamically from settings on startup.
+  - `D1TodoStorage` for Cloudflare D1 and Python SQLite connections, with raw SQL migrations in `src/migrations/`.
 - **Interactive OpenAPI Documentation**: Hosted at `/docs` (Swagger UI) and `/redoc`, with automated CI generation to `dist/openapi.json`.
 
 ---
@@ -44,16 +44,13 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
    ```
 
 4. **Configuration (`.env`):**
-   Copy or create a `.env` file with your Telnyx and Postgres settings if running live:
+   Copy `.env.example` to `.env` and configure Telnyx if running live:
    ```env
    TELNYX_API_KEY=YOUR_TELNYX_KEY
    TELNYX_CONNECTION_ID=YOUR_CONNECTION_ID
    TELNYX_FROM_NUMBER=+15551234567
 
-   # Optional Postgres settings
-   POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/claude_call
    TODO_TABLE_NAME=user_todos
-   TODO_DB_SCHEMA=public
    ```
 
 ---
@@ -67,6 +64,27 @@ make run
 uv run uvicorn src.main:app --reload
 ```
 The server will start at `http://127.0.0.1:8000`.
+
+### Database tests without Docker
+
+Run `make test` for the full Python suite, or `make test-migrate` for SQLite
+integration tests. These use Python's built-in `sqlite3` with temporary databases
+to exercise the actual D1-compatible migrations, FIFO storage, persistence,
+user isolation, and migration rollback. No database server or Docker is required.
+
+To migrate a persistent local SQLite file:
+
+```bash
+make migrate
+# Or choose a different database:
+make migrate SQLITE_PATH=/tmp/claude-call.sqlite3
+```
+
+`make run` uses in-memory storage; the SQLite file is for local database checks.
+Use `make dev-worker` for the actual D1 binding and Workers runtime, and apply
+the migrations to its local D1 database using `npx wrangler d1 execute
+claude_call_db --local --file=src/migrations/0001_create_todo_table.sql`.
+SQLite tests verify SQL behavior, not Cloudflare's JavaScript binding API.
 
 ### Interactive API Documentation
 - **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)

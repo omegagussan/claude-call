@@ -60,7 +60,7 @@ class InMemoryTodoStorage(TodoStorage):
 class D1TodoStorage(TodoStorage):
     """
     Storage implementation backed by Cloudflare D1 (SQLite).
-    Supports D1 JavaScript proxy objects, aiosqlite, and sqlite3 db connections.
+    Supports D1 JavaScript proxy objects and synchronous sqlite3 connections.
     """
 
     def __init__(
@@ -155,7 +155,7 @@ class D1TodoStorage(TodoStorage):
             )
             RETURNING item;
         """
-        row = self.d1.fetchone(query, (phone_number,))
+        row = self.d1.execute(query, (phone_number,)).fetchone()
         if row:
             val = row[0] if isinstance(row, (tuple, list)) else row.get("item")
             return str(val) if val is not None else None
@@ -182,7 +182,7 @@ class D1TodoStorage(TodoStorage):
                         items.append(str(item_val))
             return items
 
-        rows = self.d1.fetchall(query, (phone_number,))
+        rows = self.d1.execute(query, (phone_number,)).fetchall()
         items_list: list[str] = []
         if rows:
             for row in rows:
@@ -199,7 +199,3 @@ class D1TodoStorage(TodoStorage):
                 self._run_coro_if_needed(res)
         else:
             self.d1.execute(query, (phone_number,))
-
-
-# Alias for backward-compatibility if referenced elsewhere
-PostgresTodoStorage = D1TodoStorage

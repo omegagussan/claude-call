@@ -1,4 +1,6 @@
-.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi up down test-migrate setup-env sync-worker stage-worker build-worker dev-worker deploy-worker
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi migrate test-migrate setup-env sync-worker stage-worker build-worker dev-worker deploy-worker
+
+SQLITE_PATH ?= .local/claude-call.sqlite3
 
 setup-env:
 	@if [ ! -f .env ]; then cp .env.example .env && echo "[+] Created .env from .env.example"; fi
@@ -65,22 +67,7 @@ openapi generate-openapi:
 	uv run python scripts/generate_openapi.py
 
 migrate:
-	uv run python scripts/migrate.py
-
-docker-build:
-	docker build -t claude-call:latest .
-
-docker-run:
-	docker run -p 8000:8000 --rm claude-call:latest
-
-## Docker Compose targets
-
-up:
-	docker compose up --build -d
-
-down:
-	docker compose down -v
+	uv run python scripts/migrate.py "$(SQLITE_PATH)"
 
 test-migrate:
-	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from migrate
-	docker compose -f docker-compose.test.yml down -v
+	uv run pytest tests/integration/test_sqlite_storage.py

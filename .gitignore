@@ -161,6 +161,7 @@ activemq-data/
 python_modules/
 node_modules/
 .wrangler/
+.local/
 pylock.toml
 env/
 venv/

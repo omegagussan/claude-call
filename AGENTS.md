@@ -11,7 +11,7 @@ Guidelines for agentic AI pairs and automated contributors working on `claude-ca
 ## Project Structure
 - `src/`: Application code (`main.py`, `config.py`, `telnyx_client.py`, `version.py`).
 - `src/services/`: Business domain logic (`time_service.py`, `todo_service.py`, `todo_storage.py`, `migrator.py`).
-- `src/migrations/`: Raw `.sql` migrations with `{schema}`, `{table}`, and `{app_role}` placeholders.
+- `src/migrations/`: Raw SQLite-compatible `.sql` migrations shared with Cloudflare D1.
 - `tests/unit/`: Fast unit tests for isolated functions and route error handling.
 - `tests/integration/`: Multi-step call lifecycle & webhook tests mocking Telnyx with `respx`.
 - `scripts/`: Tooling scripts (`generate_openapi.py`).
@@ -22,6 +22,8 @@ Always use the `Makefile` targets:
 - `make test`: Runs all pytest suites.
 - `make test-unit`: Runs `tests/unit/`.
 - `make test-integration`: Runs `tests/integration/`.
+- `make test-migrate`: Tests migrations and storage with Python's built-in SQLite; no Docker or database server.
+- `make migrate`: Applies migrations to a local SQLite file (`SQLITE_PATH` overrides the default).
 - `make lint-fix`: Auto-fixes linter issues with Ruff.
 - `make format`: Formats code with Ruff.
 - `make openapi`: Generates `dist/openapi.json` from the FastAPI schema.
