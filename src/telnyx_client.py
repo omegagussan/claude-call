@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Any
 
 import httpx
@@ -5,8 +6,52 @@ from fastapi import Depends, HTTPException, Request
 
 from src.config import get_worker_setting, settings
 
+logger = logging.getLogger(__name__)
+
 
 class TelnyxClient:
+    async def _post(self, path: str, body: dict[str, Any], action: str) -> dict[str, Any]:
+        logger.info("telnyx_request", extra={"action": action})
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(f"{self.base_url}{path}", headers=self.headers, json=body, timeout=10.0)
+        except httpx.RequestError as exc:
+            logger.error("telnyx_transport_error", extra={"action": action, "error_type": type(exc).__name__})
+            raise
+
+        if response.is_error:
+            codes: list[str] = []
+            try:
+                data = response.json()
+            except ValueError:
+                data = None
+            if isinstance(data, dict) and isinstance(data.get("errors"), list):
+                codes = [
+                    str(error["code"])
+                    for error in data["errors"]
+                    if isinstance(error, dict)
+                    and isinstance(error.get("code"), (str, int))
+                    and str(error["code"]).isascii()
+                    and str(error["code"]).isdigit()
+                    and len(str(error["code"])) <= 12
+                ]
+            logger.error(
+                "telnyx_rejected",
+                extra={"action": action, "status_code": response.status_code, "provider_error_codes": codes},
+            )
+        response.raise_for_status()
+        result: dict[str, Any] = response.json()
+        data = result.get("data")
+        logger.info(
+            "telnyx_completed",
+            extra={
+                "action": action,
+                "status_code": response.status_code,
+                "call_control_id": data.get("call_control_id") if isinstance(data, dict) else None,
+            },
+        )
+        return result
+
     def __init__(
         self,
         api_key: str | None = None,
@@ -39,16 +84,7 @@ class TelnyxClient:
         if client_state:
             payload["client_state"] = client_state
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/calls",
-                headers=self.headers,
-                json=payload,
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            res_data: dict[str, Any] = response.json()
-            return res_data
+        return await self._post("/calls", payload, "dial")
 
     async def speak(
         self,
@@ -67,16 +103,7 @@ class TelnyxClient:
         if client_state:
             body["client_state"] = client_state
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/calls/{call_control_id}/actions/speak",
-                headers=self.headers,
-                json=body,
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            res_data: dict[str, Any] = response.json()
-            return res_data
+        return await self._post(f"/calls/{call_control_id}/actions/speak", body, "speak")
 
     async def gather_using_speak(
         self,
@@ -97,29 +124,11 @@ class TelnyxClient:
         if client_state:
             body["client_state"] = client_state
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/calls/{call_control_id}/actions/gather_using_speak",
-                headers=self.headers,
-                json=body,
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            res_data: dict[str, Any] = response.json()
-            return res_data
+        return await self._post(f"/calls/{call_control_id}/actions/gather_using_speak", body, "gather_using_speak")
 
     async def hangup(self, call_control_id: str) -> dict[str, Any]:
         """Hang up a call."""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/calls/{call_control_id}/actions/hangup",
-                headers=self.headers,
-                json={},
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            res_data: dict[str, Any] = response.json()
-            return res_data
+        return await self._post(f"/calls/{call_control_id}/actions/hangup", {}, "hangup")
 
 
 telnyx_client = TelnyxClient()
@@ -134,6 +143,7 @@ async def get_telnyx_client(request: Request) -> TelnyxClient:
     values = {key: get_worker_setting(env, key) for key in required}
     missing = [key for key, value in values.items() if not isinstance(value, str) or not value.strip()]
     if missing:
+        logger.error("worker_configuration_missing", extra={"missing_settings": missing})
         raise HTTPException(status_code=503, detail=f"Missing Worker configuration: {', '.join(missing)}")
     return TelnyxClient(
         api_key=values["TELNYX_API_KEY"],

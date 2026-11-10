@@ -1,15 +1,20 @@
 import base64
+import logging
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 
 from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
+from src.log_config import configure_logging
 from src.models import CallRequest, ErrorResponse, FrokenUrRequest, TodoCallRequest
 from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
 from src.telnyx_client import TelnyxClientDep
 from src.version import __version__
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 asgi_worker: Any = None
 try:
@@ -173,8 +178,10 @@ async def telnyx_webhook(http_request: Request, event: dict[str, Any], client: T
     call_control_id = payload.get("call_control_id")
 
     if not call_control_id:
+        logger.warning("webhook_missing_call_id", extra={"event_type": event_type})
         return {"received": True, "warning": "missing call_control_id"}
 
+    logger.info("webhook_received", extra={"event_type": event_type, "call_control_id": call_control_id})
     db = get_d1_db(http_request)
     service = TodoService(D1TodoStorage(db)) if db is not None else todo_service
 
@@ -201,6 +208,14 @@ async def telnyx_webhook(http_request: Request, event: dict[str, Any], client: T
         payload=payload,
         service=service,
         client=client,
+    )
+    logger.info(
+        "webhook_processed",
+        extra={
+            "event_type": event_type,
+            "call_control_id": call_control_id,
+            "call_status": call_state.get("status"),
+        },
     )
 
     return {

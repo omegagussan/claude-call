@@ -1,3 +1,22 @@
+import logging
+import sys
+
+from pythonjsonlogger.json import JsonFormatter
+
+
+def configure_logging() -> None:
+    """Configure application output independently of the server launcher."""
+    logger = logging.getLogger("src")
+    if any(handler.get_name() == "application-json" for handler in logger.handlers):
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.set_name("application-json")
+    handler.setFormatter(JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+
 log_config = {
     "version": 1,
     "disable_existing_loggers": False,

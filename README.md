@@ -111,6 +111,23 @@ the `API_KEYS` used to authenticate callers of this service.
 
 ## Running the Application
 
+### Live application logs
+
+Application logging initializes in the app entrypoint for both Cloudflare and
+local Python, without depending on Docker or Uvicorn configuration. JSON logs
+are written immediately to stdout and appear alongside Cloudflare invocation
+logs:
+
+```bash
+npx wrangler tail claude-call --format pretty
+```
+
+Look for `webhook_received`, `webhook_processed`, `telnyx_completed`, and
+`telnyx_rejected`. Provider failures include the actual Telnyx HTTP status and
+numeric error codes; credentials, phone numbers, request/response bodies, and
+speech content are not logged. No additional application access log is emitted.
+Cloudflare's invocation `Ok` is not an HTTP status code.
+
 ### Start the FastAPI Server
 ```bash
 make run
