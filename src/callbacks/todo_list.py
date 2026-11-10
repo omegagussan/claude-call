@@ -3,20 +3,20 @@ from typing import Any
 from src.callbacks.base import CallCallback
 from src.services.todo_service import TodoService, todo_service
 from src.services.todo_speech import OPTIONS_PROMPT, parse_todo_intent
-from src.telnyx_client import telnyx_client
 
 
 class TodoListCallback(CallCallback):
     """Callback handler for Voice Todo / Shopping List calls."""
 
     def __init__(self, service: TodoService = todo_service) -> None:
+        super().__init__()
         self.service = service
 
     async def on_answered(self, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]) -> None:
         await super().on_answered(call_control_id, call_state, payload)
         # Start initial 5-second silence gather for user command (POP, PUSH, LIST)
         call_state["status"] = "awaiting_command"
-        await telnyx_client.gather_using_speak(
+        await self.client.gather_using_speak(
             call_control_id=call_control_id,
             payload_text="",  # Quiet listen for 5s initially
             timeout_millis=5000,
@@ -43,7 +43,7 @@ class TodoListCallback(CallCallback):
             # User was quiet for 5 seconds -> announce options and listen again
             call_state["options_prompted"] = True
             call_state["status"] = "prompting_options"
-            await telnyx_client.gather_using_speak(
+            await self.client.gather_using_speak(
                 call_control_id=call_control_id,
                 payload_text=OPTIONS_PROMPT,
                 timeout_millis=10000,
@@ -57,7 +57,7 @@ class TodoListCallback(CallCallback):
             else:
                 msg = "Your list is empty. Nothing to pop."
             call_state.setdefault("history", []).append(msg)
-            await telnyx_client.gather_using_speak(
+            await self.client.gather_using_speak(
                 call_control_id=call_control_id,
                 payload_text=f"{msg} What would you like to do next?",
                 timeout_millis=10000,
@@ -67,7 +67,7 @@ class TodoListCallback(CallCallback):
             call_state["last_action"] = "PUSH"
             if not argument:
                 call_state["awaiting_push_item"] = True
-                await telnyx_client.gather_using_speak(
+                await self.client.gather_using_speak(
                     call_control_id=call_control_id,
                     payload_text="What item would you like to add?",
                     timeout_millis=10000,
@@ -77,7 +77,7 @@ class TodoListCallback(CallCallback):
                 call_state["awaiting_push_item"] = False
                 msg = f"Added {argument} to your list."
                 call_state.setdefault("history", []).append(msg)
-                await telnyx_client.gather_using_speak(
+                await self.client.gather_using_speak(
                     call_control_id=call_control_id,
                     payload_text=f"{msg} Next command?",
                     timeout_millis=10000,
@@ -92,7 +92,7 @@ class TodoListCallback(CallCallback):
                 items_str = ", ".join(items)
                 msg = f"Your list has {len(items)} items: {items_str}."
             call_state.setdefault("history", []).append(msg)
-            await telnyx_client.gather_using_speak(
+            await self.client.gather_using_speak(
                 call_control_id=call_control_id,
                 payload_text=f"{msg} Next command?",
                 timeout_millis=10000,
@@ -103,14 +103,14 @@ class TodoListCallback(CallCallback):
             call_state["awaiting_push_item"] = False
             msg = f"Added {speech_text.strip()} to your list."
             call_state.setdefault("history", []).append(msg)
-            await telnyx_client.gather_using_speak(
+            await self.client.gather_using_speak(
                 call_control_id=call_control_id,
                 payload_text=f"{msg} Next command?",
                 timeout_millis=10000,
             )
 
         else:
-            await telnyx_client.gather_using_speak(
+            await self.client.gather_using_speak(
                 call_control_id=call_control_id,
                 payload_text=f"I did not understand. {OPTIONS_PROMPT}",
                 timeout_millis=10000,

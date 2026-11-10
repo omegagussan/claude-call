@@ -35,7 +35,13 @@ class DelayedD1Binding(MockD1Binding):
 
 def app_with_db(db):
     async def bound_app(scope, receive, send):
-        await app(dict(scope, env={"DB": db}), receive, send)
+        env = {
+            "DB": db,
+            "TELNYX_API_KEY": "test-provider-key",
+            "TELNYX_CONNECTION_ID": "test-connection",
+            "TELNYX_FROM_NUMBER": "+12025550199",
+        }
+        await app(dict(scope, env=env), receive, send)
 
     return bound_app
 

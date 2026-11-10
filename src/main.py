@@ -8,7 +8,7 @@ from src.callbacks.router import webhook_router
 from src.models import CallRequest, FrokenUrRequest, TodoCallRequest
 from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
-from src.telnyx_client import telnyx_client
+from src.telnyx_client import TelnyxClientDep
 from src.version import __version__
 
 asgi_worker: Any = None
@@ -59,14 +59,12 @@ async def get_user_todos(request: Request, phone_number: str):
 
 
 @app.post("/calls/dial", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
-async def make_call(request: CallRequest):
+async def make_call(request: CallRequest, client: TelnyxClientDep):
     """Trigger a generic outbound call to a landline via Telnyx."""
     try:
         kwargs: dict[str, Any] = {"to_number": request.to_number.e164}
-        if request.webhook_url:
-            kwargs["webhook_url"] = request.webhook_url
 
-        result = await telnyx_client.dial(**kwargs)
+        result = await client.dial(**kwargs)
         data = result.get("data", {})
         call_control_id = data.get("call_control_id")
 
@@ -88,7 +86,7 @@ async def make_call(request: CallRequest):
 
 
 @app.post("/calls/froken-ur", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
-async def start_froken_ur(request: FrokenUrRequest):
+async def start_froken_ur(request: FrokenUrRequest, client: TelnyxClientDep):
     """
     Start Fröken Ur call: dials the given number and repeatedly announces the
     time in Stockholm with pauses until the user hangs up.
@@ -99,10 +97,7 @@ async def start_froken_ur(request: FrokenUrRequest):
             "to_number": request.to_number.e164,
             "client_state": client_state_str,
         }
-        if request.webhook_url:
-            kwargs["webhook_url"] = request.webhook_url
-
-        result = await telnyx_client.dial(**kwargs)
+        result = await client.dial(**kwargs)
         data = result.get("data", {})
         call_control_id = data.get("call_control_id")
 
@@ -128,7 +123,7 @@ async def start_froken_ur(request: FrokenUrRequest):
 
 
 @app.post("/calls/todo", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
-async def start_todo_call(request: TodoCallRequest):
+async def start_todo_call(request: TodoCallRequest, client: TelnyxClientDep):
     """
     Start Todo List voice call: allows user to POP, PUSH or LIST items
     via speech interaction.
@@ -139,10 +134,7 @@ async def start_todo_call(request: TodoCallRequest):
             "to_number": request.to_number.e164,
             "client_state": client_state_str,
         }
-        if request.webhook_url:
-            kwargs["webhook_url"] = request.webhook_url
-
-        result = await telnyx_client.dial(**kwargs)
+        result = await client.dial(**kwargs)
         data = result.get("data", {})
         call_control_id = data.get("call_control_id")
 
@@ -167,7 +159,7 @@ async def start_todo_call(request: TodoCallRequest):
 
 
 @app.post("/webhooks/telnyx")
-async def telnyx_webhook(http_request: Request, event: dict[str, Any]):
+async def telnyx_webhook(http_request: Request, event: dict[str, Any], client: TelnyxClientDep):
     """Handle incoming call control webhooks by delegating to WebhookRouter."""
     event_data = event.get("data", {})
     event_type = event_data.get("event_type", "")
@@ -202,6 +194,7 @@ async def telnyx_webhook(http_request: Request, event: dict[str, Any]):
         call_state=call_state,
         payload=payload,
         service=service,
+        client=client,
     )
 
     return {

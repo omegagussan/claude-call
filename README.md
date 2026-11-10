@@ -41,6 +41,11 @@ Telnyx as E.164; validation does not establish ownership or reachability.
 ID server-side using `TELNYX_FROM_NUMBER`. Old string destinations must be
 migrated to the object format; endpoint paths remain unchanged.
 
+`webhook_url` is also rejected in requests (HTTP 422). Configure the Voice API
+application's webhook URL in Telnyx to
+`https://<your-worker-hostname>/webhooks/telnyx`. Outbound calls use that
+application configuration; callers cannot override the callback destination.
+
 ---
 
 ## Prerequisites
@@ -78,6 +83,14 @@ migrated to the object format; endpoint paths remain unchanged.
 
    TODO_TABLE_NAME=user_todos
    ```
+
+For Cloudflare deployments, configure `TELNYX_API_KEY`, `TELNYX_CONNECTION_ID`,
+and `TELNYX_FROM_NUMBER` in the Worker's Variables and Secrets settings (keep
+the API key a secret). These are read from each request's Worker bindings for
+both dialing and webhook commands, not from the local `.env` file. Missing
+Worker configuration returns HTTP 503 rather than using mock credentials.
+Local Python runs continue to use `.env`. The Telnyx API key is separate from
+the `API_KEYS` used to authenticate callers of this service.
 
 ---
 

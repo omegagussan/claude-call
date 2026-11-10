@@ -1,8 +1,13 @@
 from typing import Any
 
+from src.telnyx_client import TelnyxClient, telnyx_client
+
 
 class CallCallback:
     """Abstract base class for Call Control webhook handlers."""
+
+    def __init__(self, client: TelnyxClient = telnyx_client) -> None:
+        self.client = client
 
     async def on_initiated(self, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]) -> None:
         """Handle call.initiated (ringing)."""
@@ -31,9 +36,7 @@ class GenericCallback(CallCallback):
 
     async def on_answered(self, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]) -> None:
         await super().on_answered(call_control_id, call_state, payload)
-        from src.telnyx_client import telnyx_client
-
-        await telnyx_client.speak(
+        await self.client.speak(
             call_control_id=call_control_id,
             payload_text="Hello, this is Claude Call connecting via Telnyx.",
             language="en-US",
@@ -42,7 +45,5 @@ class GenericCallback(CallCallback):
 
     async def on_speak_ended(self, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]) -> None:
         await super().on_speak_ended(call_control_id, call_state, payload)
-        from src.telnyx_client import telnyx_client
-
         call_state["status"] = "message_completed"
-        await telnyx_client.hangup(call_control_id=call_control_id)
+        await self.client.hangup(call_control_id=call_control_id)

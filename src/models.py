@@ -41,7 +41,6 @@ class CallRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     to_number: PhoneNumber
-    webhook_url: str | None = None
 
 
 class FrokenUrRequest(CallRequest):

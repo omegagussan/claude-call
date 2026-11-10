@@ -3,7 +3,6 @@ from typing import Any
 
 from src.callbacks.base import CallCallback
 from src.services.time_service import format_froken_ur_speech
-from src.telnyx_client import telnyx_client
 
 
 class FrokenUrCallback(CallCallback):
@@ -16,7 +15,7 @@ class FrokenUrCallback(CallCallback):
         call_state["last_estimated_duration"] = est_duration
         call_state.setdefault("history", []).append({"text": speech_text, "estimated_duration": est_duration})
 
-        await telnyx_client.speak(
+        await self.client.speak(
             call_control_id=call_control_id,
             payload_text=speech_text,
             language="sv-SE",
@@ -39,7 +38,7 @@ class FrokenUrCallback(CallCallback):
                 call_state["time_announcements_count"] = call_state.get("time_announcements_count", 0) + 1
                 call_state["last_estimated_duration"] = est_duration
                 call_state.setdefault("history", []).append({"text": speech_text, "estimated_duration": est_duration})
-                await telnyx_client.speak(
+                await self.client.speak(
                     call_control_id=cid,
                     payload_text=speech_text,
                     language="sv-SE",

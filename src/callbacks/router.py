@@ -1,10 +1,12 @@
 import base64
+from copy import copy
 from typing import Any
 
 from src.callbacks.base import CallCallback, GenericCallback
 from src.callbacks.froken_ur import FrokenUrCallback
 from src.callbacks.todo_list import TodoListCallback
 from src.services.todo_service import TodoService
+from src.telnyx_client import TelnyxClient
 
 
 class WebhookRouter:
@@ -49,12 +51,15 @@ class WebhookRouter:
         call_state: dict[str, Any],
         payload: dict[str, Any],
         service: TodoService | None = None,
+        client: TelnyxClient | None = None,
     ) -> None:
         """Dispatch event to handler method based on event_type."""
         call_type = call_state.get("type", "generic")
-        handler = self.get_handler(call_type)
+        handler = copy(self.get_handler(call_type))
         if isinstance(handler, TodoListCallback) and service is not None:
-            handler = TodoListCallback(service)
+            handler.service = service
+        if client is not None:
+            handler.client = client
 
         if event_type == "call.initiated":
             await handler.on_initiated(call_control_id, call_state, payload)

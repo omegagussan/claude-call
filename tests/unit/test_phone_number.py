@@ -59,6 +59,7 @@ async def test_call_endpoint_uses_e164_and_server_caller_id(endpoint, monkeypatc
         payload = json.loads(route.calls.last.request.content)
         assert payload["to"] == "+46812345678"
         assert payload["from"] == "+12025550199"
+        assert "webhook_url" not in payload
         assert active_calls[call_id]["to"] == "+46812345678"
     finally:
         active_calls.pop(call_id, None)
@@ -71,6 +72,7 @@ async def test_call_endpoint_uses_e164_and_server_caller_id(endpoint, monkeypatc
     [
         {"to_number": "+46812345678"},
         {"to_number": NUMBER, "from_number": "+12025550199"},
+        {"to_number": NUMBER, "webhook_url": "https://example.com/webhooks/telnyx"},
         {"to_number": NUMBER | {"area_code": "08"}},
     ],
 )
@@ -89,4 +91,5 @@ def test_openapi_exposes_phone_object_without_caller_override():
         definition = schema["components"]["schemas"][model]
         assert definition["properties"]["to_number"]["$ref"].endswith("/PhoneNumber")
         assert "from_number" not in definition["properties"]
+        assert "webhook_url" not in definition["properties"]
         assert definition["additionalProperties"] is False

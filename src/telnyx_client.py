@@ -1,13 +1,23 @@
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
+from fastapi import Depends, HTTPException, Request
 
-from src.config import settings
+from src.config import get_worker_setting, settings
 
 
 class TelnyxClient:
-    def __init__(self, api_key: str = settings.telnyx_api_key, base_url: str = settings.telnyx_api_base):
-        self.base_url = base_url.rstrip("/")
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        connection_id: str | None = None,
+        from_number: str | None = None,
+    ):
+        self.base_url = (base_url if base_url is not None else settings.telnyx_api_base).rstrip("/")
+        self.connection_id = connection_id if connection_id is not None else settings.telnyx_connection_id
+        self.from_number = from_number if from_number is not None else settings.telnyx_from_number
+        api_key = api_key if api_key is not None else settings.telnyx_api_key
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -17,18 +27,15 @@ class TelnyxClient:
     async def dial(
         self,
         to_number: str,
-        connection_id: str = settings.telnyx_connection_id,
-        webhook_url: str | None = None,
+        connection_id: str | None = None,
         client_state: str | None = None,
     ) -> dict[str, Any]:
         """Initiate an outbound call to a landline/PSTN or SIP endpoint."""
         payload: dict[str, Any] = {
             "to": to_number,
-            "from": settings.telnyx_from_number,
-            "connection_id": connection_id,
+            "from": self.from_number,
+            "connection_id": connection_id if connection_id is not None else self.connection_id,
         }
-        if webhook_url:
-            payload["webhook_url"] = webhook_url
         if client_state:
             payload["client_state"] = client_state
 
@@ -116,3 +123,23 @@ class TelnyxClient:
 
 
 telnyx_client = TelnyxClient()
+
+
+async def get_telnyx_client(request: Request) -> TelnyxClient:
+    env = request.scope.get("env")
+    if env is None:
+        return TelnyxClient()
+
+    required = ("TELNYX_API_KEY", "TELNYX_CONNECTION_ID", "TELNYX_FROM_NUMBER")
+    values = {key: get_worker_setting(env, key) for key in required}
+    missing = [key for key, value in values.items() if not isinstance(value, str) or not value.strip()]
+    if missing:
+        raise HTTPException(status_code=503, detail=f"Missing Worker configuration: {', '.join(missing)}")
+    return TelnyxClient(
+        api_key=values["TELNYX_API_KEY"],
+        connection_id=values["TELNYX_CONNECTION_ID"],
+        from_number=values["TELNYX_FROM_NUMBER"],
+    )
+
+
+TelnyxClientDep = Annotated[TelnyxClient, Depends(get_telnyx_client)]
