@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi migrate migrate-d1 test-migrate setup-env sync-worker stage-worker build-worker dev-worker deploy-worker tail-worker
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi migrate migrate-d1 test-migrate setup-env sync-worker stage-worker build-worker dev-worker deploy-worker tail-worker sync-worker-secrets
 
 SQLITE_PATH ?= .local/claude-call.sqlite3
 
@@ -20,6 +20,9 @@ dev-worker: setup-env sync-worker
 
 tail-worker:
 	npx --no-install wrangler tail claude-call --format pretty
+
+sync-worker-secrets:
+	uv run python scripts/sync_worker_secrets.py
 
 deploy-worker: build-worker
 	$(MAKE) migrate-d1

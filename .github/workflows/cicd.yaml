@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      sync_telnyx_secrets:
-        description: Replace Worker API_KEYS and TELNYX_API_KEY with GitHub secrets
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: write
@@ -145,26 +139,6 @@ jobs:
         run: |
           rm -f requirements.txt
           uv sync --all-groups
-
-      - name: Sync Worker API secrets
-        if: github.event_name == 'workflow_dispatch' && inputs.sync_telnyx_secrets
-        env:
-          API_KEYS: ${{ secrets.API_KEYS }}
-          TELNYX_API_KEY: ${{ secrets.TELNYX_API_KEY }}
-        run: |
-          uv run python - <<'PY'
-          import os
-          import sys
-
-          required = ("API_KEYS", "TELNYX_API_KEY")
-          missing = [key for key in required if not os.environ.get(key, "").strip()]
-          for key in missing:
-              print(f"::error::Missing GitHub Actions secret: {key}")
-          if missing:
-              sys.exit(1)
-          PY
-          uv run python -c 'import json, os; print(json.dumps({key: os.environ[key] for key in ("API_KEYS", "TELNYX_API_KEY")}))' \
-            | npx --no-install wrangler secret bulk
 
       - name: Deploy Worker and apply D1 migrations
         run: make deploy-worker

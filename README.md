@@ -97,26 +97,26 @@ application configuration; callers cannot override the callback destination.
 `API_KEYS` need encrypted Worker secrets. Normal deployments preserve these
 secrets instead of overwriting them with potentially stale GitHub values.
 
-To intentionally provision or rotate Telnyx configuration through CI, first
-update the GitHub Actions repository secrets (each command prompts for its
-value without putting it in shell history):
+To provision or rotate runtime secrets, update `API_KEYS` and `TELNYX_API_KEY`
+in your ignored local `.env`, then run:
 
 ```bash
-gh secret set TELNYX_API_KEY --repo omegagussan/claude-call
-gh secret set API_KEYS --repo omegagussan/claude-call
+make sync-worker-secrets
 ```
 
-Then explicitly run the main-branch workflow with secret synchronization enabled:
+This explicitly replaces only those two Worker secrets and can activate a new
+Worker version immediately. Both values are validated before upload and passed
+to Wrangler through stdin, never arguments or temporary files. CLI output is
+suppressed to protect credentials; failures return a nonzero exit status.
+Authenticate with `npx wrangler login`, or provide Cloudflare API credentials
+in the process environment or `.env` (the existing `CLOUDFLAIR_*` aliases are
+supported). Install Node.js and run `npm ci` first.
 
-```bash
-gh workflow run cicd.yaml --ref main -f sync_telnyx_secrets=true
-```
-
-Manual workflow runs default to preserving secrets too. When synchronization
-is requested, CI fails if any value is missing or the upload fails. Values are
-sent to Wrangler over stdin, not committed to git; other Worker secrets such
-as `API_KEYS` are preserved. The Cloudflare deployment token needs Workers
-Scripts Edit permission as well as D1 Edit for migrations.
+CI/CD never reads or syncs runtime API secrets. After provisioning Cloudflare,
+remove `API_KEYS` and `TELNYX_API_KEY` from GitHub Actions repository secrets.
+CI still requires Cloudflare deployment credentials with Workers Scripts Edit
+and D1 Edit permissions. Manual workflow runs remain available for code
+deployment without secret rotation.
 
 These settings are read from each request's Worker bindings for both dialing
 and webhook commands, not from the local `.env` file. Missing Worker
