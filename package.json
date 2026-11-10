@@ -1,0 +1,10 @@
+{
+  "name": "claude-call",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.160.0"
+  }
+}

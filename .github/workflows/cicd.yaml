@@ -32,7 +32,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Wrangler
+        run: npm ci
 
       - name: Validate Cloudflare Pyodide Sync
         run: |
@@ -118,7 +122,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Wrangler
+        run: npm ci
 
       - name: Install Worker Dependencies
         run: |

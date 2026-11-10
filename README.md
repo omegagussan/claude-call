@@ -21,7 +21,7 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
 
 - Python `>=3.15`
 - [uv](https://github.com/astral-sh/uv) (fast Python package manager)
-- Node.js `>=20` (specified in `.nvmrc`) and `npm` (for Cloudflare Wrangler CLI)
+- Node.js `>=22.12.0` (development version specified in `.nvmrc`) and `npm` (for Cloudflare Wrangler CLI)
 
 ---
 
@@ -104,12 +104,15 @@ Ensure Node.js is installed (use the version in `.nvmrc`):
 nvm install
 nvm use
 
-# Install Wrangler globally or use via npx:
-npm install -g wrangler
+# Install the project's pinned Wrangler version:
+npm ci
 
-# Or verify npx is ready:
-npx wrangler --version
+# Verify the local CLI:
+npx --no-install wrangler --version
 ```
+
+Wrangler is pinned in `package.json` and `package-lock.json`. Both CI jobs run
+`npm ci`, so PyWrangler and direct `npx wrangler` commands use the same local CLI.
 
 ### 2. Worker Build & Development Commands
 ```bash
