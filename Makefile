@@ -4,7 +4,6 @@ SQLITE_PATH ?= .local/claude-call.sqlite3
 
 setup-env:
 	@if [ ! -f .env ]; then cp .env.example .env && echo "[+] Created .env from .env.example"; fi
-	@if [ ! -L .dev.vars ] && [ ! -f .dev.vars ]; then ln -s .env .dev.vars && echo "[+] Linked .dev.vars -> .env"; fi
 
 sync-worker:
 	@rm -f requirements.txt
