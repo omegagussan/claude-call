@@ -1,5 +1,3 @@
-import asyncio
-import inspect
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any
@@ -12,22 +10,22 @@ class TodoStorage(ABC):
     """Abstract interface for Todo storage backends."""
 
     @abstractmethod
-    def push(self, phone_number: str, item: str) -> list[str]:
+    async def push(self, phone_number: str, item: str) -> list[str]:
         """Append an item to the end of the user's list and return current list."""
         raise NotImplementedError
 
     @abstractmethod
-    def pop(self, phone_number: str) -> str | None:
+    async def pop(self, phone_number: str) -> str | None:
         """Retrieve and remove the oldest item from the list (FIFO)."""
         raise NotImplementedError
 
     @abstractmethod
-    def list_items(self, phone_number: str) -> list[str]:
+    async def list_items(self, phone_number: str) -> list[str]:
         """List all items for a phone number in FIFO order."""
         raise NotImplementedError
 
     @abstractmethod
-    def clear(self, phone_number: str) -> None:
+    async def clear(self, phone_number: str) -> None:
         """Clear all items for a phone number."""
         raise NotImplementedError
 
@@ -38,22 +36,22 @@ class InMemoryTodoStorage(TodoStorage):
     def __init__(self) -> None:
         self._store: dict[str, list[str]] = defaultdict(list)
 
-    def push(self, phone_number: str, item: str) -> list[str]:
+    async def push(self, phone_number: str, item: str) -> list[str]:
         clean_item = item.strip()
         if clean_item:
             self._store[phone_number].append(clean_item)
         return list(self._store[phone_number])
 
-    def pop(self, phone_number: str) -> str | None:
+    async def pop(self, phone_number: str) -> str | None:
         items = self._store.get(phone_number)
         if items and len(items) > 0:
             return items.pop(0)
         return None
 
-    def list_items(self, phone_number: str) -> list[str]:
+    async def list_items(self, phone_number: str) -> list[str]:
         return list(self._store.get(phone_number, []))
 
-    def clear(self, phone_number: str) -> None:
+    async def clear(self, phone_number: str) -> None:
         self._store[phone_number] = []
 
 
@@ -83,54 +81,26 @@ class D1TodoStorage(TodoStorage):
             return []
         return self.migrator.apply_pending_migrations()
 
-    def _execute(self, query: str, params: tuple[Any, ...] = ()) -> Any:
-        """Execute query across D1 JS binding or Python sqlite cursor."""
-        if hasattr(self.d1, "prepare"):
-            # Cloudflare D1 JS binding
-            stmt = self.d1.prepare(query)
-            if params:
-                stmt = stmt.bind(*params)
-            res = stmt.run()
-            if inspect.isawaitable(res):
-                return self._run_coro_if_needed(res)
-            return res
-
-        # Standard sqlite3-like connection
-        return self.d1.execute(query, params)
-
-    def _run_coro_if_needed(self, awaitable: Any) -> Any:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(awaitable)
-        return loop.run_until_complete(awaitable)
-
-    def push(self, phone_number: str, item: str) -> list[str]:
+    async def push(self, phone_number: str, item: str) -> list[str]:
         clean_item = item.strip()
         if not clean_item:
-            return self.list_items(phone_number)
+            return await self.list_items(phone_number)
 
         query = f"INSERT INTO {self.table_name} (phone_number, item) VALUES (?, ?);"
         if hasattr(self.d1, "prepare"):
             stmt = self.d1.prepare(query).bind(phone_number, clean_item)
-            res = stmt.run()
-            if inspect.isawaitable(res):
-                self._run_coro_if_needed(res)
+            await stmt.run()
         else:
             self.d1.execute(query, (phone_number, clean_item))
 
-        return self.list_items(phone_number)
+        return await self.list_items(phone_number)
 
-    def pop(self, phone_number: str) -> str | None:
+    async def pop(self, phone_number: str) -> str | None:
         # SQLite / D1 FIFO pop: find oldest id, delete it, return the item
         if hasattr(self.d1, "prepare"):
             sel_query = f"SELECT id, item FROM {self.table_name} WHERE phone_number = ? ORDER BY id ASC LIMIT 1;"
             stmt = self.d1.prepare(sel_query).bind(phone_number)
-            first_res = stmt.first()
-            if inspect.isawaitable(first_res):
-                row = self._run_coro_if_needed(first_res)
-            else:
-                row = first_res
+            row = await stmt.first()
 
             if row:
                 row_dict = row.to_py() if hasattr(row, "to_py") else dict(row)
@@ -138,9 +108,7 @@ class D1TodoStorage(TodoStorage):
                 item = row_dict.get("item")
                 if row_id is not None:
                     del_query = f"DELETE FROM {self.table_name} WHERE id = ?;"
-                    del_res = self.d1.prepare(del_query).bind(row_id).run()
-                    if inspect.isawaitable(del_res):
-                        self._run_coro_if_needed(del_res)
+                    await self.d1.prepare(del_query).bind(row_id).run()
                 return str(item) if item is not None else None
             return None
 
@@ -161,17 +129,15 @@ class D1TodoStorage(TodoStorage):
             return str(val) if val is not None else None
         return None
 
-    def list_items(self, phone_number: str) -> list[str]:
+    async def list_items(self, phone_number: str) -> list[str]:
         query = f"SELECT item FROM {self.table_name} WHERE phone_number = ? ORDER BY id ASC;"
         if hasattr(self.d1, "prepare"):
             stmt = self.d1.prepare(query).bind(phone_number)
-            all_res = stmt.all()
-            if inspect.isawaitable(all_res):
-                rows_res = self._run_coro_if_needed(all_res)
-            else:
-                rows_res = all_res
+            rows_res = await stmt.all()
 
-            res_results = rows_res.results if hasattr(rows_res, "results") else rows_res
+            if hasattr(rows_res, "to_py"):
+                rows_res = rows_res.to_py()
+            res_results = rows_res["results"] if isinstance(rows_res, dict) else rows_res.results
             if hasattr(res_results, "to_py"):
                 res_results = res_results.to_py()
             items: list[str] = []
@@ -191,11 +157,9 @@ class D1TodoStorage(TodoStorage):
                     items_list.append(str(val))
         return items_list
 
-    def clear(self, phone_number: str) -> None:
+    async def clear(self, phone_number: str) -> None:
         query = f"DELETE FROM {self.table_name} WHERE phone_number = ?;"
         if hasattr(self.d1, "prepare"):
-            res = self.d1.prepare(query).bind(phone_number).run()
-            if inspect.isawaitable(res):
-                self._run_coro_if_needed(res)
+            await self.d1.prepare(query).bind(phone_number).run()
         else:
             self.d1.execute(query, (phone_number,))

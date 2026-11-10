@@ -4,6 +4,7 @@ from typing import Any
 from src.callbacks.base import CallCallback, GenericCallback
 from src.callbacks.froken_ur import FrokenUrCallback
 from src.callbacks.todo_list import TodoListCallback
+from src.services.todo_service import TodoService
 
 
 class WebhookRouter:
@@ -42,11 +43,18 @@ class WebhookRouter:
         return self._handlers.get(call_type, self._handlers["generic"])
 
     async def dispatch(
-        self, event_type: str, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]
+        self,
+        event_type: str,
+        call_control_id: str,
+        call_state: dict[str, Any],
+        payload: dict[str, Any],
+        service: TodoService | None = None,
     ) -> None:
         """Dispatch event to handler method based on event_type."""
         call_type = call_state.get("type", "generic")
         handler = self.get_handler(call_type)
+        if isinstance(handler, TodoListCallback) and service is not None:
+            handler = TodoListCallback(service)
 
         if event_type == "call.initiated":
             await handler.on_initiated(call_control_id, call_state, payload)

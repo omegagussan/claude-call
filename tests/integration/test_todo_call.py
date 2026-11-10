@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 
 from src.main import active_calls, app
 from src.services.todo_service import todo_service
+from src.services.todo_storage import InMemoryTodoStorage
 from tests.mock_telnyx import build_telnyx_event
 
 MOCK_BASE_URL = "https://api.telnyx.com/v2"
@@ -13,7 +14,7 @@ MOCK_BASE_URL = "https://api.telnyx.com/v2"
 @pytest.fixture(autouse=True)
 def cleanup():
     active_calls.clear()
-    todo_service.clear("+46709876543")
+    todo_service.set_storage(InMemoryTodoStorage())
 
 
 @pytest.mark.asyncio
@@ -74,7 +75,7 @@ async def test_todo_call_silence_then_push_list_pop():
         await client.post("/webhooks/telnyx", json=evt_push)
         assert gather_route.call_count == 3
         # Verify stored in todo_service for this phone number
-        assert todo_service.list_items(user_phone) == ["oat milk"]
+        assert await todo_service.list_items(user_phone) == ["oat milk"]
 
         # Push another item: "PUSH dark roast coffee"
         evt_push2 = build_telnyx_event(
@@ -84,7 +85,7 @@ async def test_todo_call_silence_then_push_list_pop():
             speech={"transcript": "PUSH dark roast coffee"},
         )
         await client.post("/webhooks/telnyx", json=evt_push2)
-        assert todo_service.list_items(user_phone) == ["oat milk", "dark roast coffee"]
+        assert await todo_service.list_items(user_phone) == ["oat milk", "dark roast coffee"]
 
         # Step 5: User declares intent: "LIST"
         evt_list = build_telnyx_event(
@@ -106,7 +107,7 @@ async def test_todo_call_silence_then_push_list_pop():
         await client.post("/webhooks/telnyx", json=evt_pop)
         assert active_calls[call_control_id]["last_action"] == "POP"
         # Oldest item ("oat milk") removed, "dark roast coffee" remains
-        assert todo_service.list_items(user_phone) == ["dark roast coffee"]
+        assert await todo_service.list_items(user_phone) == ["dark roast coffee"]
 
         # Step 7: Check HTTP API for todos
         todos_resp = await client.get(f"/todos/{user_phone}")
@@ -220,4 +221,4 @@ async def test_user_hangs_up_and_calls_again_to_retrieve_persisted_list():
         assert active_calls[call_2_id]["status"] == "completed"
 
         # 10. Check list state is still preserved
-        assert todo_service.list_items(user_phone) == ["Apples", "Butter"]
+        assert await todo_service.list_items(user_phone) == ["Apples", "Butter"]

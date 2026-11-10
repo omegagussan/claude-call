@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
 from src.models import CallRequest, FrokenUrRequest, TodoCallRequest
-from src.services.todo_service import todo_service
+from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
 from src.telnyx_client import telnyx_client
 from src.version import __version__
@@ -54,20 +54,8 @@ async def health():
 async def get_user_todos(request: Request, phone_number: str):
     """Retrieve current todo/shopping list items for a phone number."""
     db = get_d1_db(request)
-    if db is not None:
-        # Cloudflare D1 query
-        query = "SELECT item FROM user_todos WHERE phone_number = ? ORDER BY id ASC"
-        res = db.prepare(query).bind(phone_number).all()
-        if hasattr(res, "to_py"):
-            res = res.to_py()
-        results = res.results if hasattr(res, "results") else res
-        if hasattr(results, "to_py"):
-            results = results.to_py()
-        items = [r.get("item") if isinstance(r, dict) else r for r in (results or [])]
-        return {"phone_number": phone_number, "items": items}
-
-    # Fallback to todo_service (in-memory or default storage)
-    return {"phone_number": phone_number, "items": todo_service.list_items(phone_number)}
+    service = TodoService(D1TodoStorage(db)) if db is not None else todo_service
+    return {"phone_number": phone_number, "items": await service.list_items(phone_number)}
 
 
 @app.post("/calls/dial", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
@@ -189,10 +177,8 @@ async def telnyx_webhook(http_request: Request, event: dict[str, Any]):
     if not call_control_id:
         return {"received": True, "warning": "missing call_control_id"}
 
-    # If D1 is attached to the request, ensure todo_service uses D1TodoStorage
     db = get_d1_db(http_request)
-    if db is not None:
-        todo_service.set_storage(D1TodoStorage(d1_client=db))
+    service = TodoService(D1TodoStorage(db)) if db is not None else todo_service
 
     if call_control_id not in active_calls:
         client_state_raw = payload.get("client_state")
@@ -215,6 +201,7 @@ async def telnyx_webhook(http_request: Request, event: dict[str, Any]):
         call_control_id=call_control_id,
         call_state=call_state,
         payload=payload,
+        service=service,
     )
 
     return {

@@ -1,13 +1,16 @@
 from typing import Any
 
 from src.callbacks.base import CallCallback
-from src.services.todo_service import todo_service
+from src.services.todo_service import TodoService, todo_service
 from src.services.todo_speech import OPTIONS_PROMPT, parse_todo_intent
 from src.telnyx_client import telnyx_client
 
 
 class TodoListCallback(CallCallback):
     """Callback handler for Voice Todo / Shopping List calls."""
+
+    def __init__(self, service: TodoService = todo_service) -> None:
+        self.service = service
 
     async def on_answered(self, call_control_id: str, call_state: dict[str, Any], payload: dict[str, Any]) -> None:
         await super().on_answered(call_control_id, call_state, payload)
@@ -47,7 +50,7 @@ class TodoListCallback(CallCallback):
             )
 
         elif command == "POP":
-            popped = todo_service.pop(user_phone)
+            popped = await self.service.pop(user_phone)
             call_state["last_action"] = "POP"
             if popped:
                 msg = f"Popped {popped} from your list."
@@ -70,7 +73,7 @@ class TodoListCallback(CallCallback):
                     timeout_millis=10000,
                 )
             else:
-                todo_service.push(user_phone, argument)
+                await self.service.push(user_phone, argument)
                 call_state["awaiting_push_item"] = False
                 msg = f"Added {argument} to your list."
                 call_state.setdefault("history", []).append(msg)
@@ -82,7 +85,7 @@ class TodoListCallback(CallCallback):
 
         elif command == "LIST":
             call_state["last_action"] = "LIST"
-            items = todo_service.list_items(user_phone)
+            items = await self.service.list_items(user_phone)
             if not items:
                 msg = "Your list has no items."
             else:
@@ -96,7 +99,7 @@ class TodoListCallback(CallCallback):
             )
 
         elif call_state.get("awaiting_push_item") and speech_text:
-            todo_service.push(user_phone, speech_text.strip())
+            await self.service.push(user_phone, speech_text.strip())
             call_state["awaiting_push_item"] = False
             msg = f"Added {speech_text.strip()} to your list."
             call_state.setdefault("history", []).append(msg)

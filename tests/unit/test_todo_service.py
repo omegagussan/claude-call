@@ -1,29 +1,32 @@
+import pytest
+
 from src.services.todo_service import todo_service
 from src.services.todo_speech import parse_todo_intent
 
 
-def test_todo_service_push_pop_list():
+@pytest.mark.asyncio
+async def test_todo_service_push_pop_list():
     phone = "+46701234567"
-    todo_service.clear(phone)
+    await todo_service.clear(phone)
 
     # Empty
-    assert todo_service.list_items(phone) == []
-    assert todo_service.pop(phone) is None
+    assert await todo_service.list_items(phone) == []
+    assert await todo_service.pop(phone) is None
 
     # Push items (FIFO check)
-    todo_service.push(phone, "Apples")
-    todo_service.push(phone, "Milk")
-    todo_service.push(phone, "Bread")
+    await todo_service.push(phone, "Apples")
+    await todo_service.push(phone, "Milk")
+    await todo_service.push(phone, "Bread")
 
-    assert todo_service.list_items(phone) == ["Apples", "Milk", "Bread"]
+    assert await todo_service.list_items(phone) == ["Apples", "Milk", "Bread"]
 
     # Pop removes oldest
-    assert todo_service.pop(phone) == "Apples"
-    assert todo_service.list_items(phone) == ["Milk", "Bread"]
+    assert await todo_service.pop(phone) == "Apples"
+    assert await todo_service.list_items(phone) == ["Milk", "Bread"]
 
-    assert todo_service.pop(phone) == "Milk"
-    assert todo_service.pop(phone) == "Bread"
-    assert todo_service.pop(phone) is None
+    assert await todo_service.pop(phone) == "Milk"
+    assert await todo_service.pop(phone) == "Bread"
+    assert await todo_service.pop(phone) is None
 
 
 def test_parse_todo_intent():

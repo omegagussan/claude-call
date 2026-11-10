@@ -20,29 +20,30 @@ async def test_server_health_endpoint():
     assert response.json()["version"] == app.version
 
 
-def test_migrations_and_storage_persist_with_sqlite(tmp_path):
+@pytest.mark.asyncio
+async def test_migrations_and_storage_persist_with_sqlite(tmp_path):
     database = tmp_path / "todos.sqlite3"
     assert run_migrations(database) == ["0001_create_todo_table", "0002_apply_permissions"]
     assert run_migrations(database) == []
 
     with closing(sqlite3.connect(database)) as conn, conn:
         service = TodoService(storage=D1TodoStorage(conn))
-        assert service.list_items("alice") == []
-        assert service.pop("alice") is None
-        assert service.push("alice", "  Eggs  ") == ["Eggs"]
-        assert service.push("alice", "Milk") == ["Eggs", "Milk"]
-        service.push("bob", "Bread")
-        service.push("alice", " '); DROP TABLE user_todos; -- ")
-        assert service.pop("alice") == "Eggs"
-        assert service.list_items("bob") == ["Bread"]
+        assert await service.list_items("alice") == []
+        assert await service.pop("alice") is None
+        assert await service.push("alice", "  Eggs  ") == ["Eggs"]
+        assert await service.push("alice", "Milk") == ["Eggs", "Milk"]
+        await service.push("bob", "Bread")
+        await service.push("alice", " '); DROP TABLE user_todos; -- ")
+        assert await service.pop("alice") == "Eggs"
+        assert await service.list_items("bob") == ["Bread"]
 
     with closing(sqlite3.connect(database)) as conn, conn:
         storage = D1TodoStorage(conn)
-        assert storage.list_items("alice") == ["Milk", "'); DROP TABLE user_todos; --"]
-        assert storage.push("alice", "  ") == storage.list_items("alice")
-        storage.clear("alice")
-        assert storage.pop("alice") is None
-        assert storage.list_items("bob") == ["Bread"]
+        assert await storage.list_items("alice") == ["Milk", "'); DROP TABLE user_todos; --"]
+        assert await storage.push("alice", "  ") == await storage.list_items("alice")
+        await storage.clear("alice")
+        assert await storage.pop("alice") is None
+        assert await storage.list_items("bob") == ["Bread"]
         assert DatabaseMigrator(conn).apply_pending_migrations() == []
 
 

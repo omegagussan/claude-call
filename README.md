@@ -112,6 +112,12 @@ the migrations to its local D1 database using `npx wrangler d1 execute
 claude_call_db --local --file=src/migrations/0001_create_todo_table.sql`.
 SQLite tests verify SQL behavior, not Cloudflare's JavaScript binding API.
 
+Todo storage and service methods are asynchronous: callers must `await` their
+operations. D1 promises are awaited directly on the request event loop, and
+webhooks use request-scoped storage without replacing the global local store.
+The synchronous SQLite connection path is only for local SQL tests, not
+production request handling.
+
 ### Interactive API Documentation
 - **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
