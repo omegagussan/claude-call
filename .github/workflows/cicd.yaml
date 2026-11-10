@@ -139,5 +139,25 @@ jobs:
           rm -f requirements.txt
           uv sync --all-groups
 
+      - name: Sync Telnyx Worker secrets
+        env:
+          TELNYX_API_KEY: ${{ secrets.TELNYX_API_KEY }}
+          TELNYX_CONNECTION_ID: ${{ secrets.TELNYX_CONNECTION_ID }}
+          TELNYX_FROM_NUMBER: ${{ secrets.TELNYX_FROM_NUMBER }}
+        run: |
+          uv run python - <<'PY'
+          import os
+          import sys
+
+          required = ("TELNYX_API_KEY", "TELNYX_CONNECTION_ID", "TELNYX_FROM_NUMBER")
+          missing = [key for key in required if not os.environ.get(key, "").strip()]
+          for key in missing:
+              print(f"::error::Missing GitHub Actions secret: {key}")
+          if missing:
+              sys.exit(1)
+          PY
+          uv run python -c 'import json, os; print(json.dumps({key: os.environ[key] for key in ("TELNYX_API_KEY", "TELNYX_CONNECTION_ID", "TELNYX_FROM_NUMBER")}))' \
+            | npx --no-install wrangler secret bulk
+
       - name: Deploy Worker and apply D1 migrations
         run: make deploy-worker

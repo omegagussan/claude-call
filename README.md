@@ -84,11 +84,25 @@ application configuration; callers cannot override the callback destination.
    TODO_TABLE_NAME=user_todos
    ```
 
-For Cloudflare deployments, configure `TELNYX_API_KEY`, `TELNYX_CONNECTION_ID`,
-and `TELNYX_FROM_NUMBER` in the Worker's Variables and Secrets settings (keep
-the API key a secret). These are read from each request's Worker bindings for
-both dialing and webhook commands, not from the local `.env` file. Missing
-Worker configuration returns HTTP 503 rather than using mock credentials.
+For Cloudflare deployments, CI/CD syncs `TELNYX_API_KEY`, `TELNYX_CONNECTION_ID`,
+and `TELNYX_FROM_NUMBER` from GitHub Actions repository secrets to Worker secrets
+before deploying. Provision them once using GitHub CLI (each command prompts
+for its value without putting it in shell history):
+
+```bash
+gh secret set TELNYX_API_KEY --repo omegagussan/claude-call
+gh secret set TELNYX_CONNECTION_ID --repo omegagussan/claude-call
+gh secret set TELNYX_FROM_NUMBER --repo omegagussan/claude-call
+```
+
+CI fails if any value is missing or secret synchronization fails. Values are
+sent to Wrangler over stdin, not committed to git; other Worker secrets such
+as `API_KEYS` are preserved. The Cloudflare deployment token needs Workers
+Scripts Edit permission as well as D1 Edit for migrations.
+
+These settings are read from each request's Worker bindings for both dialing
+and webhook commands, not from the local `.env` file. Missing Worker
+configuration returns HTTP 503 rather than using mock credentials.
 Local Python runs continue to use `.env`. The Telnyx API key is separate from
 the `API_KEYS` used to authenticate callers of this service.
 
