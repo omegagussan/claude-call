@@ -43,7 +43,10 @@ async def test_froken_ur_call_flow_loop_and_hangup():
         # 1. Initiate Fröken Ur call (set pause_seconds=0 for fast test execution)
         dial_resp = await client.post(
             "/calls/froken-ur",
-            json={"to_number": "+46812345678", "pause_seconds": 0.0},
+            json={
+                "to_number": {"country_code": "+46", "area_code": "8", "subscriber_number": "12345678"},
+                "pause_seconds": 0.0,
+            },
         )
         assert dial_resp.status_code == 201
         data = dial_resp.json()
@@ -120,7 +123,13 @@ async def test_froken_ur_repeats_at_least_twice_during_call():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Step 1: Dial Fröken Ur
-        dial_resp = await client.post("/calls/froken-ur", json={"to_number": "+46811223344", "pause_seconds": 0.0})
+        dial_resp = await client.post(
+            "/calls/froken-ur",
+            json={
+                "to_number": {"country_code": "+46", "area_code": "8", "subscriber_number": "11223344"},
+                "pause_seconds": 0.0,
+            },
+        )
         assert dial_resp.status_code == 201
 
         # Step 2: Answer the call -> 1st announcement
@@ -157,7 +166,7 @@ async def test_concurrent_health_checks_during_active_froken_ur_call():
     for the call's pause or speak steps to complete.
     """
     call_control_id = "v3:concurrent-froken-health"
-    user_phone = "+46800112233"
+    user_phone = "+46812345678"
 
     respx.post(f"{MOCK_BASE_URL}/calls").respond(
         status_code=200,
@@ -170,7 +179,13 @@ async def test_concurrent_health_checks_during_active_froken_ur_call():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Start Fröken Ur with a 1.0s pause between repetitions
-        dial_resp = await client.post("/calls/froken-ur", json={"to_number": user_phone, "pause_seconds": 1.0})
+        dial_resp = await client.post(
+            "/calls/froken-ur",
+            json={
+                "to_number": {"country_code": "+46", "area_code": "8", "subscriber_number": "12345678"},
+                "pause_seconds": 1.0,
+            },
+        )
         assert dial_resp.status_code == 201
 
         # User answers the call (1st speech trigger)

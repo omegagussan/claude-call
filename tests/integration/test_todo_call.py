@@ -36,7 +36,10 @@ async def test_todo_call_silence_then_push_list_pop():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Step 1: Initiate Todo Call
-        dial_resp = await client.post("/calls/todo", json={"to_number": user_phone})
+        dial_resp = await client.post(
+            "/calls/todo",
+            json={"to_number": {"country_code": "+46", "area_code": "70", "subscriber_number": user_phone[5:]}},
+        )
         assert dial_resp.status_code == 200
         assert dial_resp.json()["mode"] == "todo_list"
 
@@ -148,7 +151,10 @@ async def test_user_hangs_up_and_calls_again_to_retrieve_persisted_list():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # === FIRST CALL ===
         # 1. Dial call 1
-        dial_resp1 = await client.post("/calls/todo", json={"to_number": user_phone})
+        dial_resp1 = await client.post(
+            "/calls/todo",
+            json={"to_number": {"country_code": "+46", "area_code": "70", "subscriber_number": user_phone[5:]}},
+        )
         assert dial_resp1.status_code == 200
         assert dial_resp1.json()["call_control_id"] == call_1_id
 
@@ -183,7 +189,10 @@ async def test_user_hangs_up_and_calls_again_to_retrieve_persisted_list():
 
         # === SECOND CALL (New call_control_id, same phone number) ===
         # 6. Dial call 2
-        dial_resp2 = await client.post("/calls/todo", json={"to_number": user_phone})
+        dial_resp2 = await client.post(
+            "/calls/todo",
+            json={"to_number": {"country_code": "+46", "area_code": "70", "subscriber_number": user_phone[5:]}},
+        )
         assert dial_resp2.status_code == 200
         assert dial_resp2.json()["call_control_id"] == call_2_id
 

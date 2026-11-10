@@ -15,6 +15,32 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
   - `D1TodoStorage` for Cloudflare D1 and Python SQLite connections, with raw SQL migrations in `src/migrations/`.
 - **Interactive OpenAPI Documentation**: Hosted at `/docs` (Swagger UI) and `/redoc`, with automated CI generation to `dist/openapi.json`.
 
+## API 0.3.0: structured phone numbers
+
+This release changes `to_number` from a string to a validated object on all
+three call endpoints (`/calls/dial`, `/calls/froken-ur`, and `/calls/todo`):
+
+```json
+{
+  "to_number": {
+    "country_code": "+46",
+    "area_code": "8",
+    "subscriber_number": "12345678"
+  }
+}
+```
+
+`area_code` is the riktnummer or mobile prefix in international form: Stockholm
+`8` instead of `08`, or Swedish mobile prefix `70` instead of `070`. Preserve
+significant zeros in countries such as Italy. For numbering plans without a
+destination prefix, use an empty area code. Components must be strings.
+Numbers are validated against international numbering metadata and sent to
+Telnyx as E.164; validation does not establish ownership or reachability.
+
+`from_number` is no longer accepted in requests (HTTP 422). Configure the caller
+ID server-side using `TELNYX_FROM_NUMBER`. Old string destinations must be
+migrated to the object format; endpoint paths remain unchanged.
+
 ---
 
 ## Prerequisites

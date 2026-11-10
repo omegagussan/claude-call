@@ -74,9 +74,7 @@ async def get_user_todos(request: Request, phone_number: str):
 async def make_call(request: CallRequest):
     """Trigger a generic outbound call to a landline via Telnyx."""
     try:
-        kwargs: dict[str, Any] = {"to_number": request.to_number}
-        if request.from_number:
-            kwargs["from_number"] = request.from_number
+        kwargs: dict[str, Any] = {"to_number": request.to_number.e164}
         if request.webhook_url:
             kwargs["webhook_url"] = request.webhook_url
 
@@ -88,7 +86,7 @@ async def make_call(request: CallRequest):
             active_calls[call_control_id] = {
                 "type": "generic",
                 "status": "initiating",
-                "to": request.to_number,
+                "to": request.to_number.e164,
                 "data": data,
             }
 
@@ -110,11 +108,9 @@ async def start_froken_ur(request: FrokenUrRequest):
     try:
         client_state_str = base64.b64encode(b"froken_ur").decode("utf-8")
         kwargs: dict[str, Any] = {
-            "to_number": request.to_number,
+            "to_number": request.to_number.e164,
             "client_state": client_state_str,
         }
-        if request.from_number:
-            kwargs["from_number"] = request.from_number
         if request.webhook_url:
             kwargs["webhook_url"] = request.webhook_url
 
@@ -126,7 +122,7 @@ async def start_froken_ur(request: FrokenUrRequest):
             active_calls[call_control_id] = {
                 "type": "froken_ur",
                 "status": "initiating",
-                "to": request.to_number,
+                "to": request.to_number.e164,
                 "pause_seconds": request.pause_seconds,
                 "time_announcements_count": 0,
                 "last_estimated_duration": 0.0,
@@ -152,11 +148,9 @@ async def start_todo_call(request: TodoCallRequest):
     try:
         client_state_str = base64.b64encode(b"todo_list").decode("utf-8")
         kwargs: dict[str, Any] = {
-            "to_number": request.to_number,
+            "to_number": request.to_number.e164,
             "client_state": client_state_str,
         }
-        if request.from_number:
-            kwargs["from_number"] = request.from_number
         if request.webhook_url:
             kwargs["webhook_url"] = request.webhook_url
 
@@ -168,7 +162,7 @@ async def start_todo_call(request: TodoCallRequest):
             active_calls[call_control_id] = {
                 "type": "todo_list",
                 "status": "initiating",
-                "to": request.to_number,
+                "to": request.to_number.e164,
                 "options_prompted": False,
                 "last_action": None,
                 "history": [],

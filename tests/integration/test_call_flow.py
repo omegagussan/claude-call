@@ -48,7 +48,7 @@ async def test_full_call_lifecycle_mocked():
         # Step A: Initiate Dial
         dial_resp = await client.post(
             "/calls/dial",
-            json={"to_number": "+15559876543"},
+            json={"to_number": {"country_code": "+1", "area_code": "202", "subscriber_number": "5550123"}},
         )
         assert dial_resp.status_code == 201
         assert dial_resp.json()["call_control_id"] == call_control_id

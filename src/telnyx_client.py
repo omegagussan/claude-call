@@ -17,7 +17,6 @@ class TelnyxClient:
     async def dial(
         self,
         to_number: str,
-        from_number: str = settings.telnyx_from_number,
         connection_id: str = settings.telnyx_connection_id,
         webhook_url: str | None = None,
         client_state: str | None = None,
@@ -25,7 +24,7 @@ class TelnyxClient:
         """Initiate an outbound call to a landline/PSTN or SIP endpoint."""
         payload: dict[str, Any] = {
             "to": to_number,
-            "from": from_number,
+            "from": settings.telnyx_from_number,
             "connection_id": connection_id,
         }
         if webhook_url:

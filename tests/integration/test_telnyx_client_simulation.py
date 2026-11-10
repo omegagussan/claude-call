@@ -9,7 +9,8 @@ from tests.mock_telnyx import build_telnyx_event
 BASE_URL = "http://127.0.0.1:8000"
 
 
-async def run_simulation(target_phone: str = "+15551234567"):
+async def run_simulation():
+    target_phone = {"country_code": "+1", "area_code": "202", "subscriber_number": "5550123"}
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
         print(f"[*] Step 1: Requesting outbound call to landline: {target_phone}...")
         try:
