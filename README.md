@@ -108,3 +108,25 @@ make dev-worker
 make deploy-worker
 # (runs `npx wrangler deploy`)
 ```
+
+### Cloudflare D1 Database Configuration
+
+The application uses Cloudflare D1 (serverless SQLite). The database was created and linked via `wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "claude_call_db"
+database_id = "7eb8c9df-c768-42c9-b7af-7f5aaa7a8821"
+```
+
+To create a new D1 database if needed:
+```bash
+npx wrangler d1 create claude_call_db
+```
+
+To apply database migrations to the remote Cloudflare D1 database:
+```bash
+npx wrangler d1 execute claude_call_db --remote --file=src/migrations/0001_create_todo_table.sql
+npx wrangler d1 execute claude_call_db --remote --file=src/migrations/0002_apply_permissions.sql
+```

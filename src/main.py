@@ -30,9 +30,11 @@ def get_d1_db(request: Request) -> Any | None:
     scope_env = request.scope.get("env")
     if scope_env is not None:
         if isinstance(scope_env, dict):
-            return scope_env.get("DB")
+            return scope_env.get("DB") or scope_env.get("claude_call_db")
         if hasattr(scope_env, "DB"):
             return scope_env.DB
+        if hasattr(scope_env, "claude_call_db"):
+            return scope_env.claude_call_db
     return None
 
 
