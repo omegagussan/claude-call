@@ -23,7 +23,33 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
 - **Interactive OpenAPI Documentation**: Hosted at `/docs` (Swagger UI) and `/redoc`, with automated CI generation to `dist/openapi.json`.
   All endpoints document a shared HTTP 500 error schema with a string `detail` field.
 
-## API 0.3.0: structured phone numbers
+## API 0.4.0: destination verification
+
+Trial accounts can require individual destination verification even when the
+country is allowed by the outbound profile. All endpoints below require this
+service's API key and use the same structured `phone_number` object as
+`to_number` in call requests:
+
+1. `POST /numbers/verifications` with `phone_number` and
+   `verification_method: "sms"` or `"call"` explicitly sends an ownership code.
+   Provider charges may apply. Only request codes for numbers you control or
+   have permission to verify.
+2. `POST /numbers/verifications/confirm` with `phone_number` and
+   `verification_code` (a digit string) submits the received code.
+3. `POST /numbers/verifications/status` with `phone_number` reads the current
+   `verified` status and `verified_at` without sending any code.
+
+Verification is account-wide in Telnyx, not tied to an individual API key of
+this service. No verification messages or calls are sent automatically.
+Calls remain allowed without a verification precheck on unrestricted accounts.
+If Telnyx returns the specific unverified-destination restriction, all three
+call endpoints return HTTP 403 with `code: "destination_verification_required"`,
+an instruction to verify/whitelist the number, and the provider status/codes.
+Other authorization errors (including other uses of Telnyx code 10010) remain
+HTTP 502. Incorrect verification codes also return the structured provider
+error, without echoing the submitted code. No automatic retries are performed.
+
+### Structured phone numbers (introduced in 0.3.0)
 
 This release changes `to_number` from a string to a validated object on all
 three call endpoints (`/calls/dial`, `/calls/froken-ur`, and `/calls/todo`):

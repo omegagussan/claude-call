@@ -9,10 +9,22 @@ from fastapi.responses import JSONResponse
 from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
 from src.log_config import configure_logging
-from src.models import CallRequest, ErrorResponse, FrokenUrRequest, ProviderErrorResponse, TodoCallRequest
+from src.models import (
+    CallRequest,
+    ConfirmVerificationRequest,
+    DestinationVerificationRequired,
+    ErrorResponse,
+    FrokenUrRequest,
+    NumberVerificationRequest,
+    ProviderErrorResponse,
+    StartVerificationRequest,
+    TodoCallRequest,
+    VerificationRequested,
+    VerificationStatus,
+)
 from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
-from src.telnyx_client import TelnyxClientDep, provider_error_codes
+from src.telnyx_client import TelnyxClientDep, destination_verification_required, provider_error_codes
 from src.version import __version__
 from src.webhook_auth import verify_telnyx_signature
 
@@ -43,6 +55,14 @@ app = FastAPI(
 
 @app.exception_handler(httpx.HTTPStatusError)
 async def handle_provider_error(request: Request, exc: httpx.HTTPStatusError) -> JSONResponse:
+    if destination_verification_required(exc):
+        verification_error = DestinationVerificationRequired(
+            detail="Verify (whitelist) this destination number before calling it.",
+            provider="telnyx",
+            provider_status=403,
+            provider_error_codes=provider_error_codes(exc.response),
+        )
+        return JSONResponse(status_code=403, content=verification_error.model_dump())
     error = ProviderErrorResponse(
         detail="Telnyx rejected the request",
         provider="telnyx",
@@ -50,6 +70,41 @@ async def handle_provider_error(request: Request, exc: httpx.HTTPStatusError) ->
         provider_error_codes=provider_error_codes(exc.response),
     )
     return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content=error.model_dump())
+
+
+@app.post("/numbers/verifications", dependencies=[Depends(verify_api_key)])
+async def start_number_verification(
+    request: StartVerificationRequest, client: TelnyxClientDep
+) -> VerificationRequested:
+    """Explicitly send a verification code via SMS or call; provider charges may apply."""
+    await client.start_number_verification(request.phone_number.e164, request.verification_method)
+    return VerificationRequested(phone_number=request.phone_number.e164)
+
+
+def verification_status(phone_number: str, result: dict[str, Any] | None) -> VerificationStatus:
+    if result is None:
+        return VerificationStatus(phone_number=phone_number, verified=False)
+    data = result.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("verified_at"), str) or not data["verified_at"]:
+        logger.error("telnyx_invalid_verification_response")
+        raise HTTPException(status_code=502, detail="Invalid Telnyx verification response")
+    return VerificationStatus(phone_number=phone_number, verified=True, verified_at=data["verified_at"])
+
+
+@app.post("/numbers/verifications/confirm", dependencies=[Depends(verify_api_key)])
+async def confirm_number_verification(
+    request: ConfirmVerificationRequest, client: TelnyxClientDep
+) -> VerificationStatus:
+    """Submit the code received by the number's owner."""
+    result = await client.confirm_number_verification(request.phone_number.e164, request.verification_code)
+    return verification_status(request.phone_number.e164, result)
+
+
+@app.post("/numbers/verifications/status", dependencies=[Depends(verify_api_key)])
+async def number_verification_status(request: NumberVerificationRequest, client: TelnyxClientDep) -> VerificationStatus:
+    """Read verification status without sending a code or placing a call."""
+    result = await client.number_verification_status(request.phone_number.e164)
+    return verification_status(request.phone_number.e164, result)
 
 
 # In-memory tracking for call state
@@ -88,7 +143,17 @@ async def get_user_todos(request: Request, phone_number: str):
     return {"phone_number": phone_number, "items": await service.list_items(phone_number)}
 
 
-@app.post("/calls/dial", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
+@app.post(
+    "/calls/dial",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_api_key)],
+    responses={
+        403: {
+            "model": DestinationVerificationRequired | ErrorResponse,
+            "description": "Destination verification required or API key forbidden",
+        }
+    },
+)
 async def make_call(request: CallRequest, client: TelnyxClientDep):
     """Trigger a generic outbound call to a landline via Telnyx."""
     try:
@@ -117,7 +182,17 @@ async def make_call(request: CallRequest, client: TelnyxClientDep):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/calls/froken-ur", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
+@app.post(
+    "/calls/froken-ur",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_api_key)],
+    responses={
+        403: {
+            "model": DestinationVerificationRequired | ErrorResponse,
+            "description": "Destination verification required or API key forbidden",
+        }
+    },
+)
 async def start_froken_ur(request: FrokenUrRequest, client: TelnyxClientDep):
     """
     Start Fröken Ur call: dials the given number and repeatedly announces the
@@ -156,7 +231,17 @@ async def start_froken_ur(request: FrokenUrRequest, client: TelnyxClientDep):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/calls/todo", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
+@app.post(
+    "/calls/todo",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(verify_api_key)],
+    responses={
+        403: {
+            "model": DestinationVerificationRequired | ErrorResponse,
+            "description": "Destination verification required or API key forbidden",
+        }
+    },
+)
 async def start_todo_call(request: TodoCallRequest, client: TelnyxClientDep):
     """
     Start Todo List voice call: allows user to POP, PUSH or LIST items

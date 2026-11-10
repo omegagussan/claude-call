@@ -27,12 +27,32 @@ def provider_error_codes(response: httpx.Response) -> list[str]:
     ]
 
 
+def destination_verification_required(exc: httpx.HTTPStatusError) -> bool:
+    if exc.response.status_code != 403 or exc.request.url.path != "/v2/calls":
+        return False
+    try:
+        data = exc.response.json()
+    except ValueError:
+        return False
+    if not isinstance(data, dict) or not isinstance(data.get("errors"), list):
+        return False
+    return any(
+        isinstance(error, dict)
+        and str(error.get("code")) == "10010"
+        and isinstance(error.get("detail"), str)
+        and "can not make calls to non-verified numbers at this account level" in error["detail"].lower()
+        for error in data["errors"]
+    )
+
+
 class TelnyxClient:
-    async def _post(self, path: str, body: dict[str, Any], action: str) -> dict[str, Any]:
+    async def _request(self, method: str, path: str, body: dict[str, Any] | None, action: str) -> dict[str, Any]:
         logger.info("telnyx_request", extra={"action": action})
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(f"{self.base_url}{path}", headers=self.headers, json=body, timeout=10.0)
+                response = await client.request(
+                    method, f"{self.base_url}{path}", headers=self.headers, json=body, timeout=10.0
+                )
         except httpx.RequestError as exc:
             logger.error("telnyx_transport_error", extra={"action": action, "error_type": type(exc).__name__})
             raise
@@ -58,6 +78,31 @@ class TelnyxClient:
             },
         )
         return result
+
+    async def _post(self, path: str, body: dict[str, Any], action: str) -> dict[str, Any]:
+        return await self._request("POST", path, body, action)
+
+    async def start_number_verification(self, phone_number: str, method: str) -> dict[str, Any]:
+        return await self._post(
+            "/verified_numbers",
+            {"phone_number": phone_number, "verification_method": method},
+            "start_number_verification",
+        )
+
+    async def confirm_number_verification(self, phone_number: str, code: str) -> dict[str, Any]:
+        return await self._post(
+            f"/verified_numbers/{phone_number}/actions/verify",
+            {"verification_code": code},
+            "confirm_number_verification",
+        )
+
+    async def number_verification_status(self, phone_number: str) -> dict[str, Any] | None:
+        try:
+            return await self._request("GET", f"/verified_numbers/{phone_number}", None, "number_verification_status")
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                return None
+            raise
 
     def __init__(
         self,

@@ -86,7 +86,7 @@ async def test_invalid_call_request_never_reaches_telnyx(endpoint, body):
 
 def test_openapi_exposes_phone_object_without_caller_override():
     schema = app.openapi()
-    assert schema["info"]["version"] == "0.3.0"
+    assert schema["info"]["version"] == "0.4.0"
     for model in ("CallRequest", "FrokenUrRequest", "TodoCallRequest"):
         definition = schema["components"]["schemas"][model]
         assert definition["properties"]["to_number"]["$ref"].endswith("/PhoneNumber")

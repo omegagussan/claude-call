@@ -1,3 +1,5 @@
+from typing import Literal
+
 import phonenumbers
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -10,6 +12,10 @@ class ProviderErrorResponse(ErrorResponse):
     provider: str
     provider_status: int
     provider_error_codes: list[str]
+
+
+class DestinationVerificationRequired(ProviderErrorResponse):
+    code: Literal["destination_verification_required"] = "destination_verification_required"
 
 
 class PhoneNumber(BaseModel):
@@ -59,3 +65,28 @@ class FrokenUrRequest(CallRequest):
 
 class TodoCallRequest(CallRequest):
     pass
+
+
+class NumberVerificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    phone_number: PhoneNumber
+
+
+class StartVerificationRequest(NumberVerificationRequest):
+    verification_method: Literal["sms", "call"]
+
+
+class ConfirmVerificationRequest(NumberVerificationRequest):
+    verification_code: str = Field(min_length=1, max_length=32, pattern=r"^[0-9]+$", repr=False)
+
+
+class VerificationRequested(BaseModel):
+    phone_number: str
+    status: Literal["verification_requested"] = "verification_requested"
+
+
+class VerificationStatus(BaseModel):
+    phone_number: str
+    verified: bool
+    verified_at: str | None = None

@@ -1,6 +1,6 @@
 [project]
 name = "claude-call"
-version = "0.3.0"
+version = "0.4.0"
 requires-python = ">=3.15"
 dependencies = [
     "ecdsa>=0.19.2",
