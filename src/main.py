@@ -1,8 +1,9 @@
 import base64
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 
+from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
 from src.models import CallRequest, FrokenUrRequest, TodoCallRequest
 from src.services.todo_service import todo_service
@@ -29,13 +30,13 @@ async def health():
     return {"status": "healthy", "version": app.version}
 
 
-@app.get("/todos/{phone_number}")
+@app.get("/todos/{phone_number}", dependencies=[Depends(verify_api_key)])
 async def get_user_todos(phone_number: str):
     """Retrieve current todo/shopping list items for a phone number."""
     return {"phone_number": phone_number, "items": todo_service.list_items(phone_number)}
 
 
-@app.post("/calls/dial", status_code=status.HTTP_201_CREATED)
+@app.post("/calls/dial", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
 async def make_call(request: CallRequest):
     """Trigger a generic outbound call to a landline via Telnyx."""
     try:
@@ -66,7 +67,7 @@ async def make_call(request: CallRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/calls/froken-ur", status_code=status.HTTP_201_CREATED)
+@app.post("/calls/froken-ur", status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
 async def start_froken_ur(request: FrokenUrRequest):
     """
     Start Fröken Ur call: dials the given number and repeatedly announces the
@@ -108,7 +109,7 @@ async def start_froken_ur(request: FrokenUrRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/calls/todo", status_code=status.HTTP_200_OK)
+@app.post("/calls/todo", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
 async def start_todo_call(request: TodoCallRequest):
     """
     Start Todo List voice call: allows user to POP, PUSH or LIST items
@@ -191,7 +192,7 @@ async def telnyx_webhook(event: dict[str, Any]):
     }
 
 
-@app.get("/calls/{call_control_id}")
+@app.get("/calls/{call_control_id}", dependencies=[Depends(verify_api_key)])
 async def get_call_status(call_control_id: str):
     """Check current tracked state of a call."""
     if call_control_id not in active_calls:

@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     db_app_role: str = "claude_call_app"
     auto_apply_migrations: bool = True
 
+    # Account / External Provider Keys
+    anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
+
+    # Claude Call API Authentication
+    api_key_auth_enabled: bool = False
+    api_keys: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
