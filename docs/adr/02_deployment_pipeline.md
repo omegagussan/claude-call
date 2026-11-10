@@ -16,6 +16,8 @@ We deploy exclusively through **GitHub Actions** (`.github/workflows/cicd.yaml`)
 1. Cloudflare Workers Builds Git integration is **disabled / disconnected** in the Cloudflare dashboard.
 2. The deployment job runs only **after** the `validate` job succeeds (all linting, Ruff format checks, Mypy static typing, unit tests, and OpenAPI spec generation pass).
 3. Cloudflare credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`) are stored in GitHub Actions Secrets.
+4. `make deploy-worker` applies pending D1 migrations from `src/migrations/` before deploying the Worker. Wrangler records applied files in `d1_migrations`; failures prevent the upload.
+5. Production deployment jobs are serialized without canceling a running migration or deployment. Schema migrations must remain compatible with the previous Worker until the new upload succeeds.
 
 ## Consequences
 - **Pros**:

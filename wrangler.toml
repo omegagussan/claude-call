@@ -16,6 +16,7 @@ command = "make stage-worker"
 binding = "DB" # The namespace injected into the ASGI scope
 database_name = "claude_call_db"
 database_id = "7eb8c9df-c768-42c9-b7af-7f5aaa7a8821"
+migrations_dir = "src/migrations"
 
 [observability.logs]
 enabled = true

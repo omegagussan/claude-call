@@ -143,7 +143,7 @@ make dev-worker
 
 # 3. Deploy worker to Cloudflare
 make deploy-worker
-# (runs `npx wrangler deploy`)
+# (applies pending remote D1 migrations, then runs `uv run pywrangler deploy`)
 ```
 
 Wrangler runs `make stage-worker` before bundling. This stages application sources
@@ -167,8 +167,17 @@ To create a new D1 database if needed:
 npx wrangler d1 create claude_call_db
 ```
 
-To apply database migrations to the remote Cloudflare D1 database:
+Every deployment through GitHub Actions or `make deploy-worker` applies pending
+SQL files from `src/migrations/` before uploading the Worker. Wrangler tracks
+applied files in `d1_migrations`; unchanged deployments do not rerun them.
+A migration failure stops deployment. Production deployments are serialized.
+
+To apply pending migrations separately:
 ```bash
-npx wrangler d1 execute claude_call_db --remote --file=src/migrations/0001_create_todo_table.sql
-npx wrangler d1 execute claude_call_db --remote --file=src/migrations/0002_apply_permissions.sql
+make migrate-d1
 ```
+
+The deployment API token needs D1 write permissions as well as Worker deployment
+permissions. Add new numbered SQL files rather than editing applied migrations.
+Keep schema changes compatible with the currently running Worker: migrations
+run first and remain applied if the subsequent Worker upload fails.

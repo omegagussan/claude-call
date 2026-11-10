@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi migrate test-migrate setup-env sync-worker stage-worker build-worker dev-worker deploy-worker
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi migrate migrate-d1 test-migrate setup-env sync-worker stage-worker build-worker dev-worker deploy-worker
 
 SQLITE_PATH ?= .local/claude-call.sqlite3
 
@@ -20,7 +20,11 @@ dev-worker: setup-env sync-worker
 	uv run pywrangler dev
 
 deploy-worker: build-worker
-	npx wrangler deploy
+	$(MAKE) migrate-d1
+	uv run pywrangler deploy
+
+migrate-d1:
+	npx --no-install wrangler d1 migrations apply claude_call_db --remote
 
 test:
 	uv run pytest
