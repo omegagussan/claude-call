@@ -5,6 +5,13 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
 ## Features
 
 - **Fröken Ur Service (`POST /calls/froken-ur`)**: Dials a recipient and periodically reads out the current time in Stockholm in Swedish (*"Vid ett pip är klockan..."*), calculating TTS duration and pausing before repeating the time progression until the user hangs up.
+  Each `call.speak.ended` webhook schedules the next announcement as a FastAPI
+  background task. Cloudflare's ASGI adapter keeps that task alive with
+  `wait_until` after sending the webhook response; no user speech is required.
+  This is bounded post-response work (Cloudflare allows up to 30 seconds), not
+  an indefinitely running call loop. Keep pauses short (default: 3 seconds)
+  to leave time for the Telnyx request. Call state is still in memory, so
+  cross-instance state and durable scheduling are not guaranteed.
 - **Voice Todo / Shopping List (`POST /calls/todo`)**: Interactive voice assistant allowing users to manage a personal list by phone number using voice commands:
   - `POP`: Retrieves and removes the oldest item from the list (FIFO).
   - `PUSH <item>`: Appends an item to the end of the list.

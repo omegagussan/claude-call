@@ -45,7 +45,4 @@ class FrokenUrCallback(CallCallback):
                     voice="female",
                 )
 
-        if pause == 0:
-            await _delayed_next_announcement(call_control_id, 0.0)
-        else:
-            asyncio.create_task(_delayed_next_announcement(call_control_id, pause))
+        await _delayed_next_announcement(call_control_id, pause)

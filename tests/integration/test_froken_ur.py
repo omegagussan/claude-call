@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 import respx
@@ -194,11 +195,14 @@ async def test_concurrent_health_checks_during_active_froken_ur_call():
             json=build_telnyx_event("call.answered", call_control_id, to=user_phone),
         )
 
-        # First speak finishes -> triggers 1.0s background pause task
-        await client.post(
-            "/webhooks/telnyx",
-            json=build_telnyx_event("call.speak.ended", call_control_id, to=user_phone),
+        # HTTPX waits for ASGI background work, even after the response body is sent.
+        repeat_request = asyncio.create_task(
+            client.post(
+                "/webhooks/telnyx",
+                json=build_telnyx_event("call.speak.ended", call_control_id, to=user_phone),
+            )
         )
+        await asyncio.sleep(0.05)
 
         # Call state should be in 'looping' state while the 1.0s pause ticks
         assert active_calls[call_control_id]["status"] == "looping"
@@ -217,6 +221,62 @@ async def test_concurrent_health_checks_during_active_froken_ur_call():
             assert resp.status_code == 200
             assert resp.json() == {"status": "healthy", "version": app.version}
 
-        # Wait for the 1.0s pause to complete and trigger the second speech
-        await asyncio.sleep(1.1)
+        assert not repeat_request.done()
+        assert (await repeat_request).status_code == 200
         assert active_calls[call_control_id]["time_announcements_count"] >= 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hangup_during_pause", [False, True])
+@respx.mock
+async def test_default_pause_runs_after_response_and_finishes_with_asgi_task(monkeypatch, hangup_during_pause):
+    call_id = "request-lifetime-regression"
+    response_sent = asyncio.Event()
+    pause_started = asyncio.Event()
+    resume = asyncio.Event()
+
+    async def controlled_pause(seconds):
+        assert seconds == 3.0
+        assert response_sent.is_set()
+        pause_started.set()
+        await resume.wait()
+
+    monkeypatch.setattr("src.callbacks.froken_ur.asyncio", SimpleNamespace(sleep=controlled_pause))
+    respx.post(f"{MOCK_BASE_URL}/calls").respond(200, json={"data": {"call_control_id": call_id}})
+    speak = respx.post(f"{MOCK_BASE_URL}/calls/{call_id}/actions/speak").respond(200, json={"data": {}})
+    gather = respx.post(f"{MOCK_BASE_URL}/calls/{call_id}/actions/gather_using_speak").respond(200, json={"data": {}})
+
+    async def observe_response(scope, receive, send):
+        async def observed_send(message):
+            await send(message)
+            if message["type"] == "http.response.body" and not message.get("more_body", False):
+                response_sent.set()
+
+        await app(scope, receive, observed_send)
+
+    async with AsyncClient(transport=ASGITransport(app=observe_response), base_url="http://test") as client:
+        dial = await client.post(
+            "/calls/froken-ur",
+            json={"to_number": {"country_code": "+46", "area_code": "8", "subscriber_number": "12345678"}},
+        )
+        assert dial.status_code == 201
+        await client.post("/webhooks/telnyx", json=build_telnyx_event("call.answered", call_id))
+        assert speak.call_count == 1
+        response_sent.clear()
+        pending = asyncio.create_task(
+            client.post("/webhooks/telnyx", json=build_telnyx_event("call.speak.ended", call_id))
+        )
+        try:
+            await asyncio.wait_for(pause_started.wait(), timeout=1)
+            assert response_sent.is_set()
+            assert not pending.done()
+            assert speak.call_count == 1
+            if hangup_during_pause:
+                await client.post("/webhooks/telnyx", json=build_telnyx_event("call.hangup", call_id))
+            resume.set()
+            assert (await pending).status_code == 200
+            assert speak.call_count == (1 if hangup_during_pause else 2)
+            assert not gather.called
+        finally:
+            resume.set()
+            await pending

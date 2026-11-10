@@ -2,7 +2,7 @@ import base64
 import logging
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 
 from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
@@ -170,7 +170,9 @@ async def start_todo_call(request: TodoCallRequest, client: TelnyxClientDep):
 
 
 @app.post("/webhooks/telnyx")
-async def telnyx_webhook(http_request: Request, event: dict[str, Any], client: TelnyxClientDep):
+async def telnyx_webhook(
+    http_request: Request, event: dict[str, Any], client: TelnyxClientDep, background_tasks: BackgroundTasks
+):
     """Handle incoming call control webhooks by delegating to WebhookRouter."""
     event_data = event.get("data", {})
     event_type = event_data.get("event_type", "")
@@ -200,23 +202,40 @@ async def telnyx_webhook(http_request: Request, event: dict[str, Any], client: T
     call_state = active_calls[call_control_id]
     call_state["last_event"] = event_type
 
-    # Dispatch to the application callback class (FrokenUrCallback, TodoListCallback, GenericCallback)
-    await webhook_router.dispatch(
-        event_type=event_type,
-        call_control_id=call_control_id,
-        call_state=call_state,
-        payload=payload,
-        service=service,
-        client=client,
-    )
-    logger.info(
-        "webhook_processed",
-        extra={
-            "event_type": event_type,
-            "call_control_id": call_control_id,
-            "call_status": call_state.get("status"),
-        },
-    )
+    async def dispatch_event() -> None:
+        try:
+            await webhook_router.dispatch(
+                event_type=event_type,
+                call_control_id=call_control_id,
+                call_state=call_state,
+                payload=payload,
+                service=service,
+                client=client,
+            )
+        except Exception as exc:
+            logger.error(
+                "webhook_failed",
+                extra={
+                    "event_type": event_type,
+                    "call_control_id": call_control_id,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            raise
+        logger.info(
+            "webhook_processed",
+            extra={
+                "event_type": event_type,
+                "call_control_id": call_control_id,
+                "call_status": call_state.get("status"),
+            },
+        )
+
+    if call_state.get("type") == "froken_ur" and event_type == "call.speak.ended":
+        background_tasks.add_task(dispatch_event)
+        logger.info("announcement_scheduled", extra={"call_control_id": call_control_id})
+    else:
+        await dispatch_event()
 
     return {
         "received": True,
