@@ -4,6 +4,12 @@ base_dir = ".wrangler/worker"
 compatibility_flags = ["python_workers"]
 compatibility_date = "2026-11-10"
 
+[vars]
+TELNYX_PUBLIC_KEY = "CDJMzvzBItFqK1R7o95rSkgPEL7jAtvDq0cwzgeGl4o="
+API_KEY_AUTH_ENABLED = "true"
+TELNYX_CONNECTION_ID = "3090148110773519427"
+TELNYX_FROM_NUMBER = "+13414440878"
+
 [[rules]]
 type = "Data"
 globs = ["pyproject.toml"]

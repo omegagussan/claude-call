@@ -92,9 +92,10 @@ application configuration; callers cannot override the callback destination.
    TODO_TABLE_NAME=user_todos
    ```
 
-Normal deployments preserve existing Worker secrets, including `TELNYX_API_KEY`,
-`TELNYX_CONNECTION_ID`, and `TELNYX_FROM_NUMBER`. They do not overwrite working
-configuration with potentially stale GitHub secrets.
+`wrangler.toml` owns the non-secret Worker variables `TELNYX_CONNECTION_ID`,
+`TELNYX_FROM_NUMBER`, and `API_KEY_AUTH_ENABLED`. Only `TELNYX_API_KEY` and
+`API_KEYS` need encrypted Worker secrets. Normal deployments preserve these
+secrets instead of overwriting them with potentially stale GitHub values.
 
 To intentionally provision or rotate Telnyx configuration through CI, first
 update the GitHub Actions repository secrets (each command prompts for its
@@ -102,9 +103,7 @@ value without putting it in shell history):
 
 ```bash
 gh secret set TELNYX_API_KEY --repo omegagussan/claude-call
-gh secret set TELNYX_CONNECTION_ID --repo omegagussan/claude-call
-gh secret set TELNYX_FROM_NUMBER --repo omegagussan/claude-call
-gh secret set TELNYX_PUBLIC_KEY --repo omegagussan/claude-call
+gh secret set API_KEYS --repo omegagussan/claude-call
 ```
 
 Then explicitly run the main-branch workflow with secret synchronization enabled:
@@ -135,8 +134,8 @@ the `API_KEYS` used to authenticate callers of this service.
 `telnyx-timestamp` headers, not Basic auth or this service's API key.
 Configure `TELNYX_PUBLIC_KEY` with your Telnyx account's base64 Ed25519 public
 key (not your API key). For local Python use `.env`; on Cloudflare use the
-Worker binding, provisioned with `npx wrangler secret put TELNYX_PUBLIC_KEY`
-or the explicit CI secret-sync run documented above.
+Worker binding, configured as a non-secret `TELNYX_PUBLIC_KEY` entry in
+`wrangler.toml`'s `[vars]` section. The public verification key is not a secret.
 
 Verification covers the exact raw body prefixed with `timestamp|`.
 Timestamps more than five minutes old or ahead are rejected with HTTP 401.
