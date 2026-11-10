@@ -92,10 +92,13 @@ application configuration; callers cannot override the callback destination.
    TODO_TABLE_NAME=user_todos
    ```
 
-For Cloudflare deployments, CI/CD syncs `TELNYX_API_KEY`, `TELNYX_CONNECTION_ID`,
-and `TELNYX_FROM_NUMBER` from GitHub Actions repository secrets to Worker secrets
-before deploying. Provision them once using GitHub CLI (each command prompts
-for its value without putting it in shell history):
+Normal deployments preserve existing Worker secrets, including `TELNYX_API_KEY`,
+`TELNYX_CONNECTION_ID`, and `TELNYX_FROM_NUMBER`. They do not overwrite working
+configuration with potentially stale GitHub secrets.
+
+To intentionally provision or rotate Telnyx configuration through CI, first
+update the GitHub Actions repository secrets (each command prompts for its
+value without putting it in shell history):
 
 ```bash
 gh secret set TELNYX_API_KEY --repo omegagussan/claude-call
@@ -103,7 +106,14 @@ gh secret set TELNYX_CONNECTION_ID --repo omegagussan/claude-call
 gh secret set TELNYX_FROM_NUMBER --repo omegagussan/claude-call
 ```
 
-CI fails if any value is missing or secret synchronization fails. Values are
+Then explicitly run the main-branch workflow with secret synchronization enabled:
+
+```bash
+gh workflow run cicd.yaml --ref main -f sync_telnyx_secrets=true
+```
+
+Manual workflow runs default to preserving secrets too. When synchronization
+is requested, CI fails if any value is missing or the upload fails. Values are
 sent to Wrangler over stdin, not committed to git; other Worker secrets such
 as `API_KEYS` are preserved. The Cloudflare deployment token needs Workers
 Scripts Edit permission as well as D1 Edit for migrations.

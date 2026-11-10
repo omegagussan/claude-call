@@ -5,6 +5,13 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      sync_telnyx_secrets:
+        description: Replace Worker Telnyx settings with GitHub secrets
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -104,7 +111,7 @@ jobs:
   deploy:
     name: Deploy Worker to Cloudflare
     needs: validate
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     concurrency:
       group: cloudflare-production
@@ -140,6 +147,7 @@ jobs:
           uv sync --all-groups
 
       - name: Sync Telnyx Worker secrets
+        if: github.event_name == 'workflow_dispatch' && inputs.sync_telnyx_secrets
         env:
           TELNYX_API_KEY: ${{ secrets.TELNYX_API_KEY }}
           TELNYX_CONNECTION_ID: ${{ secrets.TELNYX_CONNECTION_ID }}
