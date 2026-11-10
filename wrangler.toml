@@ -1,0 +1,9 @@
+name = "claude-call"
+main = "src/main.py"
+compatibility_flags = ["python_workers"]
+compatibility_date = "2026-11-10"
+
+[[d1_databases]]
+binding = "DB" # The namespace injected into the ASGI scope
+database_name = "claude_call_db"
+database_id = "target_db_id"

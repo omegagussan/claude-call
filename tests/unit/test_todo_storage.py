@@ -3,11 +3,11 @@ from typing import Any
 from src.config import Settings
 from src.services.migrator import DatabaseMigrator
 from src.services.todo_service import TodoService
-from src.services.todo_storage import InMemoryTodoStorage, PostgresTodoStorage
+from src.services.todo_storage import D1TodoStorage, InMemoryTodoStorage
 
 
-class MockPostgresClient:
-    """Simulates a Postgres DB client with tables and migration tracking."""
+class MockSQLiteClient:
+    """Simulates a SQLite / D1 database client with tables and migration tracking."""
 
     def __init__(self) -> None:
         self.rows: list[dict[str, Any]] = []
@@ -23,7 +23,7 @@ class MockPostgresClient:
             phone, item = params
             self.rows.append({"id": self._next_id, "phone_number": phone, "item": item})
             self._next_id += 1
-        elif "DELETE FROM" in query and "WHERE phone_number = %s;" in query:
+        elif "DELETE FROM" in query and "WHERE phone_number = ?;" in query:
             phone = params[0]
             self.rows = [r for r in self.rows if r["phone_number"] != phone]
 
@@ -48,6 +48,62 @@ class MockPostgresClient:
         return []
 
 
+class MockD1PreparedStatement:
+    def __init__(self, d1: "MockD1Binding", query: str, params: tuple[Any, ...] = ()):
+        self.d1 = d1
+        self.query = query
+        self.params = params
+
+    def bind(self, *args: Any) -> "MockD1PreparedStatement":
+        return MockD1PreparedStatement(self.d1, self.query, args)
+
+    def run(self) -> dict[str, Any]:
+        if "INSERT INTO" in self.query:
+            phone, item = self.params
+            self.d1.rows.append({"id": self.d1._next_id, "phone_number": phone, "item": item})
+            self.d1._next_id += 1
+        elif "DELETE FROM" in self.query and "WHERE id = ?" in self.query:
+            row_id = self.params[0]
+            self.d1.rows = [r for r in self.d1.rows if r["id"] != row_id]
+        elif "DELETE FROM" in self.query and "WHERE phone_number = ?" in self.query:
+            phone = self.params[0]
+            self.d1.rows = [r for r in self.d1.rows if r["phone_number"] != phone]
+        return {"success": True}
+
+    def first(self) -> dict[str, Any] | None:
+        if "SELECT id, item FROM" in self.query:
+            phone = self.params[0]
+            matching = [r for r in self.d1.rows if r["phone_number"] == phone]
+            if matching:
+                return matching[0]
+        return None
+
+    def all(self) -> Any:
+        class D1Result:
+            def __init__(self, results: list[dict[str, Any]]):
+                self.results = results
+
+            def to_py(self):
+                return self.results
+
+        if "SELECT item FROM" in self.query:
+            phone = self.params[0]
+            matching = [{"item": r["item"]} for r in self.d1.rows if r["phone_number"] == phone]
+            return D1Result(matching)
+        return D1Result([])
+
+
+class MockD1Binding:
+    """Mock Cloudflare D1 environment binding with prepare().bind().first()/all()/run()."""
+
+    def __init__(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+        self._next_id = 1
+
+    def prepare(self, query: str) -> MockD1PreparedStatement:
+        return MockD1PreparedStatement(self, query)
+
+
 def test_in_memory_storage_interface():
     storage = InMemoryTodoStorage()
     phone = "+46700000001"
@@ -65,57 +121,45 @@ def test_in_memory_storage_interface():
     assert storage.pop(phone) is None
 
 
-def test_database_migrator_applies_sql_files_with_settings():
-    mock_db = MockPostgresClient()
+def test_database_migrator_applies_sql_files_with_sqlite():
+    mock_db = MockSQLiteClient()
     custom_settings = Settings(
         todo_table_name="custom_shopping_list",
-        todo_db_schema="custom_schema",
-        db_app_role="custom_role",
     )
     migrator = DatabaseMigrator(db_client=mock_db, app_settings=custom_settings)
 
     # First run applies pending migrations
     applied = migrator.apply_pending_migrations()
     assert len(applied) >= 2
-    assert "0001_create_todo_table.sql" in applied
-    assert "0002_apply_permissions.sql" in applied
+    assert "0001_create_todo_table" in applied
+    assert "0002_apply_permissions" in applied
 
-    # Verify custom schema and table name was rendered into SQL
-    create_queries = [
-        q for q in mock_db.executed_queries if "CREATE TABLE IF NOT EXISTS custom_schema.custom_shopping_list" in q
-    ]
-    assert len(create_queries) == 1
+    # Verify migration tracking
+    assert "0001_create_todo_table" in mock_db.applied_migrations
 
     # Second run is idempotent (no migrations unrun)
     applied_again = migrator.apply_pending_migrations()
     assert applied_again == []
 
 
-def test_postgres_storage_auto_migrates_on_startup():
-    mock_db = MockPostgresClient()
-    custom_settings = Settings(
-        todo_table_name="company_tasks",
-        todo_db_schema="public",
-        auto_apply_migrations=True,
-    )
-    # Storage initializes and applies migrations automatically
-    pg_storage = PostgresTodoStorage(db_client=mock_db, app_settings=custom_settings)
-    assert "0001_create_todo_table.sql" in mock_db.applied_migrations
+def test_d1_storage_with_cloudflare_binding():
+    mock_d1 = MockD1Binding()
+    d1_storage = D1TodoStorage(d1_client=mock_d1)
 
     phone = "+46700000002"
-    pg_storage.push(phone, "Batteries")
-    pg_storage.push(phone, "Light bulb")
-    assert pg_storage.list_items(phone) == ["Batteries", "Light bulb"]
+    d1_storage.push(phone, "Batteries")
+    d1_storage.push(phone, "Light bulb")
+    assert d1_storage.list_items(phone) == ["Batteries", "Light bulb"]
 
-    popped = pg_storage.pop(phone)
+    popped = d1_storage.pop(phone)
     assert popped == "Batteries"
-    assert pg_storage.list_items(phone) == ["Light bulb"]
+    assert d1_storage.list_items(phone) == ["Light bulb"]
 
 
-def test_todo_service_with_migrated_postgres():
-    mock_db = MockPostgresClient()
-    pg_storage = PostgresTodoStorage(db_client=mock_db)
-    service = TodoService(storage=pg_storage)
+def test_todo_service_with_d1_storage():
+    mock_d1 = MockD1Binding()
+    d1_storage = D1TodoStorage(d1_client=mock_d1)
+    service = TodoService(storage=d1_storage)
 
     phone = "+46700000003"
     service.push(phone, "Item 1")

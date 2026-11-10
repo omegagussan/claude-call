@@ -1,10 +1,6 @@
--- Migration 0002: Apply table and sequence permissions for application role if configured
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{app_role}') THEN
-        EXECUTE 'GRANT USAGE ON SCHEMA {schema} TO {app_role};';
-        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON {schema}.{table} TO {app_role};';
-        EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA {schema} TO {app_role};';
-    END IF;
-END
-$$;
+-- Migration 0002: In SQLite / D1, table permissions are managed via Cloudflare API token / bindings.
+-- This migration ensures schema metadata table exists.
+CREATE TABLE IF NOT EXISTS _schema_migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TEXT DEFAULT (datetime('now'))
+);

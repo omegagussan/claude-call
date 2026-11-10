@@ -1,11 +1,9 @@
--- Migration 0001: Create schema, todo table, and index
-CREATE SCHEMA IF NOT EXISTS {schema};
-
-CREATE TABLE IF NOT EXISTS {schema}.{table} (
-    id SERIAL PRIMARY KEY,
-    phone_number VARCHAR(32) NOT NULL,
+-- Migration 0001: Create todo table and index in SQLite / Cloudflare D1
+CREATE TABLE IF NOT EXISTS user_todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone_number TEXT NOT NULL,
     item TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_{table}_phone ON {schema}.{table}(phone_number, id);
+CREATE INDEX IF NOT EXISTS idx_user_todos_phone ON user_todos(phone_number, id);

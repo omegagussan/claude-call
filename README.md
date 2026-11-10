@@ -70,3 +70,41 @@ The server will start at `http://127.0.0.1:8000`.
 ### Interactive API Documentation
 - **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+---
+
+## Generating `requirements.txt` from `pyproject.toml`
+
+Dependencies are single-sourced in `pyproject.toml` and managed by `uv`.
+
+To generate/export a flat `requirements.txt` (e.g. for Pyodide, Cloudflare Workers, or legacy pip environments without dev dependencies or hashes):
+
+```bash
+make requirements
+# or directly via uv:
+uv export --format requirements-txt --no-hashes --no-dev > requirements.txt
+```
+
+If you also need development packages included:
+```bash
+uv export --format requirements-txt --no-hashes > requirements.txt
+```
+
+---
+
+## Cloudflare Worker Targets
+
+When working with Cloudflare Workers (Pyodide Wasm runtime):
+
+```bash
+# 1. Build worker prerequisites (regenerates requirements.txt & openapi schema)
+make build-worker
+
+# 2. Start local Cloudflare worker development server
+make dev-worker
+# (runs `npx wrangler dev`)
+
+# 3. Deploy worker to Cloudflare
+make deploy-worker
+# (runs `npx wrangler deploy`)
+```
