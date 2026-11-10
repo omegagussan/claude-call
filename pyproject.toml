@@ -3,6 +3,7 @@ name = "claude-call"
 version = "0.3.0"
 requires-python = ">=3.15"
 dependencies = [
+    "ecdsa>=0.19.2",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
     "phonenumberslite>=9.0.0",

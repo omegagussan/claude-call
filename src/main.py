@@ -14,6 +14,7 @@ from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
 from src.telnyx_client import TelnyxClientDep, provider_error_codes
 from src.version import __version__
+from src.webhook_auth import verify_telnyx_signature
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -193,7 +194,14 @@ async def start_todo_call(request: TodoCallRequest, client: TelnyxClientDep):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/webhooks/telnyx")
+@app.post(
+    "/webhooks/telnyx",
+    dependencies=[Depends(verify_telnyx_signature)],
+    responses={
+        401: {"model": ErrorResponse, "description": "Invalid Telnyx signature or stale timestamp"},
+        503: {"model": ErrorResponse, "description": "Webhook verification is not configured"},
+    },
+)
 async def telnyx_webhook(
     http_request: Request, event: dict[str, Any], client: TelnyxClientDep, background_tasks: BackgroundTasks
 ):

@@ -104,6 +104,7 @@ value without putting it in shell history):
 gh secret set TELNYX_API_KEY --repo omegagussan/claude-call
 gh secret set TELNYX_CONNECTION_ID --repo omegagussan/claude-call
 gh secret set TELNYX_FROM_NUMBER --repo omegagussan/claude-call
+gh secret set TELNYX_PUBLIC_KEY --repo omegagussan/claude-call
 ```
 
 Then explicitly run the main-branch workflow with secret synchronization enabled:
@@ -127,6 +128,23 @@ the `API_KEYS` used to authenticate callers of this service.
 ---
 
 ## Running the Application
+
+### Telnyx callback authentication
+
+`POST /webhooks/telnyx` requires Telnyx's `telnyx-signature-ed25519` and
+`telnyx-timestamp` headers, not Basic auth or this service's API key.
+Configure `TELNYX_PUBLIC_KEY` with your Telnyx account's base64 Ed25519 public
+key (not your API key). For local Python use `.env`; on Cloudflare use the
+Worker binding, provisioned with `npx wrangler secret put TELNYX_PUBLIC_KEY`
+or the explicit CI secret-sync run documented above.
+
+Verification covers the exact raw body prefixed with `timestamp|`.
+Timestamps more than five minutes old or ahead are rejected with HTTP 401.
+Missing or invalid server key configuration fails closed with HTTP 503.
+Provision the public key before deploying this change or callbacks will fail.
+The timestamp window limits replay age; it does not deduplicate retries within
+that window. Test lifecycle fixtures bypass verification; signature tests use
+real Ed25519 signing keys and the actual callback route.
 
 ### Live application logs
 

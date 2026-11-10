@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     telnyx_connection_id: str = "conn_mock_123"
     telnyx_from_number: str = "+15551234567"
     telnyx_api_base: str = "https://api.telnyx.com/v2"
+    telnyx_public_key: str | None = None
 
     # Database / D1 Settings
     todo_table_name: str = "user_todos"
