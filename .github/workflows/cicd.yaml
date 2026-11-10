@@ -29,6 +29,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate Cloudflare Pyodide Sync
+        run: |
+          rm -f requirements.txt
+          uv run pywrangler sync
+
       - name: Check formatting with Ruff
         run: uv run ruff format --check .
 

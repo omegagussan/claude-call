@@ -1,17 +1,18 @@
-.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi up down test-migrate setup-env requirements build-worker dev-worker deploy-worker
+.PHONY: test test-unit test-integration test-v typecheck lint format check run simulate pre-commit-install openapi generate-openapi up down test-migrate setup-env sync-worker build-worker dev-worker deploy-worker
 
 setup-env:
 	@if [ ! -f .env ]; then cp .env.example .env && echo "[+] Created .env from .env.example"; fi
 	@if [ ! -L .dev.vars ] && [ ! -f .dev.vars ]; then ln -s .env .dev.vars && echo "[+] Linked .dev.vars -> .env"; fi
 
-requirements:
-	uv export --format requirements-txt --no-hashes --no-dev > requirements.txt
+sync-worker:
+	@rm -f requirements.txt
+	uv run pywrangler sync
 
-build-worker: requirements openapi
+build-worker: sync-worker openapi
 	@echo "[+] Worker dependencies and OpenAPI assets built successfully."
 
-dev-worker: setup-env requirements
-	npx wrangler dev
+dev-worker: setup-env sync-worker
+	uv run pywrangler dev
 
 deploy-worker: build-worker
 	npx wrangler deploy

@@ -11,3 +11,17 @@ binding = "DB" # The namespace injected into the ASGI scope
 database_name = "claude_call_db"
 database_id = "7eb8c9df-c768-42c9-b7af-7f5aaa7a8821"
 
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
+
+[observability.issue_detection]
+enabled = false
+
