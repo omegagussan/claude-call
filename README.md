@@ -21,6 +21,7 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
 
 - Python `>=3.15`
 - [uv](https://github.com/astral-sh/uv) (fast Python package manager)
+- Node.js `>=20` (specified in `.nvmrc`) and `npm` (for Cloudflare Wrangler CLI)
 
 ---
 
@@ -96,6 +97,21 @@ uv export --format requirements-txt --no-hashes > requirements.txt
 
 When working with Cloudflare Workers (Pyodide Wasm runtime):
 
+### 1. Installing Wrangler CLI
+Ensure Node.js is installed (use the version in `.nvmrc`):
+```bash
+# If using nvm (Node Version Manager):
+nvm install
+nvm use
+
+# Install Wrangler globally or use via npx:
+npm install -g wrangler
+
+# Or verify npx is ready:
+npx wrangler --version
+```
+
+### 2. Worker Build & Development Commands
 ```bash
 # 1. Build worker prerequisites (regenerates requirements.txt & openapi schema)
 make build-worker
