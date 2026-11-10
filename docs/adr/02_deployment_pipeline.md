@@ -12,7 +12,7 @@ However, Cloudflare Workers Builds has a critical limitation:
 - If a commit introduces broken business logic, failing unit tests, or broken database queries, Cloudflare still builds and deploys it to production.
 
 ## Decision
-We deploy exclusively through **GitHub Actions** (`.github/workflows/cicd.yaml`) using `cloudflare/wrangler-action`:
+We deploy exclusively through **GitHub Actions** (`.github/workflows/cicd.yaml`) using `uv run pywrangler deploy`. PyWrangler syncs Python dependencies and invokes the compatible Wrangler CLI:
 1. Cloudflare Workers Builds Git integration is **disabled / disconnected** in the Cloudflare dashboard.
 2. The deployment job runs only **after** the `validate` job succeeds (all linting, Ruff format checks, Mypy static typing, unit tests, and OpenAPI spec generation pass).
 3. Cloudflare credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`) are stored in GitHub Actions Secrets.
