@@ -37,3 +37,17 @@ async def test_docs_and_openapi_endpoints():
         resp_openapi = await client.get("/openapi.json")
         assert resp_openapi.status_code == 200
         assert resp_openapi.json()["info"]["title"] == "Claude Call - Fröken Ur & Telnyx"
+
+
+def test_openapi_documents_default_500_response_on_every_operation():
+    schema = app.openapi()
+    for path in schema["paths"].values():
+        for operation in path.values():
+            response = operation["responses"]["500"]
+            assert response["description"] == "Internal server error"
+            assert response["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/ErrorResponse"}
+    error_schema = schema["components"]["schemas"]["ErrorResponse"]
+    assert error_schema["properties"]["detail"]["type"] == "string"
+    assert error_schema["required"] == ["detail"]
+    assert "201" in schema["paths"]["/calls/froken-ur"]["post"]["responses"]
+    assert "422" in schema["paths"]["/calls/froken-ur"]["post"]["responses"]

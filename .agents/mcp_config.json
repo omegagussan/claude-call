@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "telnyx": {
+      "url": "https://api.telnyx.com/v2/mcp",
+      "headers": {
+        "Authorization": "Bearer ${TELNYX_API_KEY}"
+      }
+    }
+  }
+}

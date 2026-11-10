@@ -14,6 +14,7 @@ FastAPI service integrating **Telnyx Call Control / SIP** to place automated voi
   - `InMemoryTodoStorage` for local development, tests, and dry-runs.
   - `D1TodoStorage` for Cloudflare D1 and Python SQLite connections, with raw SQL migrations in `src/migrations/`.
 - **Interactive OpenAPI Documentation**: Hosted at `/docs` (Swagger UI) and `/redoc`, with automated CI generation to `dist/openapi.json`.
+  All endpoints document a shared HTTP 500 error schema with a string `detail` field.
 
 ## API 0.3.0: structured phone numbers
 

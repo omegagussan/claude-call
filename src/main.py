@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 
 from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
-from src.models import CallRequest, FrokenUrRequest, TodoCallRequest
+from src.models import CallRequest, ErrorResponse, FrokenUrRequest, TodoCallRequest
 from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
 from src.telnyx_client import TelnyxClientDep
@@ -20,6 +20,12 @@ except ImportError:
 app = FastAPI(
     title="Claude Call - Fröken Ur & Telnyx",
     version=__version__,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+    },
 )
 
 # In-memory tracking for call state

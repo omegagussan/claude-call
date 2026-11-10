@@ -2,6 +2,10 @@ import phonenumbers
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class ErrorResponse(BaseModel):
+    detail: str
+
+
 class PhoneNumber(BaseModel):
     """International number components, excluding national trunk prefixes."""
 
