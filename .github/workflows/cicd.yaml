@@ -120,14 +120,13 @@ jobs:
         with:
           node-version: 20
 
-      - name: Sync Worker Dependencies
+      - name: Install Worker Dependencies
         run: |
           rm -f requirements.txt
           uv sync --all-groups
-          uv run pywrangler sync
 
-      - name: Deploy via Wrangler Action
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLAIR_DEPLOY_KEY }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy via PyWrangler
+        run: uv run pywrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLAIR_DEPLOY_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLAIR_ACCOUNT_ID }}
