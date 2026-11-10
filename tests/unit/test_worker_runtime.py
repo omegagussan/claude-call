@@ -1,6 +1,59 @@
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 from fastapi import FastAPI
+
+from scripts.stage_worker import stage_worker
+
+
+def test_worker_bundle_preserves_package_layout(tmp_path):
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "__init__.py").write_text("")
+    (source / "main.py").write_text("from src.auth import verify_api_key\n")
+    (source / "auth.py").write_text("verify_api_key = None\n")
+    (source / "__pycache__").mkdir()
+    (source / "__pycache__" / "main.pyc").write_bytes(b"cached")
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n')
+    (tmp_path / ".env").write_text("NOT_FOR_DEPLOYMENT=true\n")
+
+    destination = stage_worker(tmp_path)
+
+    assert (destination / "src" / "__init__.py").is_file()
+    assert (destination / "src" / "main.py").read_text() == (source / "main.py").read_text()
+    assert (destination / "src" / "auth.py").is_file()
+    assert (destination / "pyproject.toml").read_text() == (tmp_path / "pyproject.toml").read_text()
+    assert not (destination / "src" / "__pycache__").exists()
+    assert not (destination / ".env").exists()
+
+    (source / "auth.py").unlink()
+    stage_worker(tmp_path)
+    assert not (destination / "src" / "auth.py").exists()
+
+
+def test_wrangler_uses_staged_package_root():
+    config = tomllib.loads(Path("wrangler.toml").read_text())
+
+    assert config["main"] == ".wrangler/worker/src/main.py"
+    assert config["base_dir"] == ".wrangler/worker"
+    assert config["build"]["command"] == "make stage-worker"
+
+
+def test_worker_timezone_without_system_database():
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from zoneinfo import reset_tzpath; reset_tzpath([]); "
+            "from src.services.time_service import STOCKHOLM_TZ; "
+            "assert STOCKHOLM_TZ.key == 'Europe/Stockholm'",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_fastapi_and_worker_entrypoint():
@@ -23,3 +76,4 @@ def test_python_modules_vendoring_structure():
         assert (python_modules_dir / "fastapi").is_dir()
         assert (python_modules_dir / "pydantic").is_dir()
         assert (python_modules_dir / "workers").is_dir()
+        assert (python_modules_dir / "tzdata").is_dir()

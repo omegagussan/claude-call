@@ -1,10 +1,16 @@
 name = "claude-call"
-main = "src/main.py"
+main = ".wrangler/worker/src/main.py"
+base_dir = ".wrangler/worker"
 compatibility_flags = ["python_workers"]
 compatibility_date = "2026-11-10"
 
+[[rules]]
+type = "Data"
+globs = ["pyproject.toml"]
+fallthrough = true
+
 [build]
-command = "uvx --from workers-py pywrangler sync"
+command = "make stage-worker"
 
 [[d1_databases]]
 binding = "DB" # The namespace injected into the ASGI scope
@@ -24,4 +30,3 @@ persist = true
 
 [observability.issue_detection]
 enabled = false
-

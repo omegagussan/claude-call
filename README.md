@@ -113,7 +113,7 @@ npx wrangler --version
 
 ### 2. Worker Build & Development Commands
 ```bash
-# 1. Build worker prerequisites (regenerates requirements.txt & openapi schema)
+# 1. Build worker prerequisites (syncs dependencies and generates the OpenAPI schema)
 make build-worker
 
 # 2. Start local Cloudflare worker development server
@@ -124,6 +124,11 @@ make dev-worker
 make deploy-worker
 # (runs `npx wrangler deploy`)
 ```
+
+Wrangler runs `make stage-worker` before bundling. This stages application sources
+under `.wrangler/worker/src/`, preserving `src.*` imports without bundling the
+repository's virtual environments or local configuration. The project metadata
+is included so the deployed application reads its version from `pyproject.toml`.
 
 ### Cloudflare D1 Database Configuration
 
