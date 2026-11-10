@@ -126,7 +126,7 @@ are written immediately to stdout and appear alongside Cloudflare invocation
 logs:
 
 ```bash
-npx wrangler tail claude-call --format pretty
+make tail-worker
 ```
 
 Look for `webhook_received`, `webhook_processed`, `telnyx_completed`, and
@@ -134,6 +134,14 @@ Look for `webhook_received`, `webhook_processed`, `telnyx_completed`, and
 numeric error codes; credentials, phone numbers, request/response bodies, and
 speech content are not logged. No additional application access log is emitted.
 Cloudflare's invocation `Ok` is not an HTTP status code.
+
+Telnyx HTTP rejections return HTTP **502** from this API, with `detail`,
+`provider: "telnyx"`, `provider_status` (for example 403), and
+`provider_error_codes`. The same status and codes appear in `telnyx_rejected`
+logs. Raw provider messages are deliberately excluded because they can echo
+private request data. API authentication failures still use HTTP 401/403.
+Start `make tail-worker` **before** reproducing an error: tail streams new
+events, not historical ones. For past events use Cloudflare's persisted Logs.
 
 ### Start the FastAPI Server
 ```bash

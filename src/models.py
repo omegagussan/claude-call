@@ -6,6 +6,12 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
+class ProviderErrorResponse(ErrorResponse):
+    provider: str
+    provider_status: int
+    provider_error_codes: list[str]
+
+
 class PhoneNumber(BaseModel):
     """International number components, excluding national trunk prefixes."""
 

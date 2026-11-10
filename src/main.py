@@ -2,15 +2,17 @@ import base64
 import logging
 from typing import Any
 
+import httpx
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 
 from src.auth import verify_api_key
 from src.callbacks.router import webhook_router
 from src.log_config import configure_logging
-from src.models import CallRequest, ErrorResponse, FrokenUrRequest, TodoCallRequest
+from src.models import CallRequest, ErrorResponse, FrokenUrRequest, ProviderErrorResponse, TodoCallRequest
 from src.services.todo_service import TodoService, todo_service
 from src.services.todo_storage import D1TodoStorage
-from src.telnyx_client import TelnyxClientDep
+from src.telnyx_client import TelnyxClientDep, provider_error_codes
 from src.version import __version__
 
 configure_logging()
@@ -30,8 +32,24 @@ app = FastAPI(
             "model": ErrorResponse,
             "description": "Internal server error",
         },
+        status.HTTP_502_BAD_GATEWAY: {
+            "model": ProviderErrorResponse,
+            "description": "Telnyx rejected an upstream request",
+        },
     },
 )
+
+
+@app.exception_handler(httpx.HTTPStatusError)
+async def handle_provider_error(request: Request, exc: httpx.HTTPStatusError) -> JSONResponse:
+    error = ProviderErrorResponse(
+        detail="Telnyx rejected the request",
+        provider="telnyx",
+        provider_status=exc.response.status_code,
+        provider_error_codes=provider_error_codes(exc.response),
+    )
+    return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content=error.model_dump())
+
 
 # In-memory tracking for call state
 active_calls: dict[str, dict[str, Any]] = {}
@@ -92,6 +110,8 @@ async def make_call(request: CallRequest, client: TelnyxClientDep):
             "call_control_id": call_control_id,
             "call_leg_id": data.get("call_leg_id"),
         }
+    except httpx.HTTPStatusError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -129,6 +149,8 @@ async def start_froken_ur(request: FrokenUrRequest, client: TelnyxClientDep):
             "call_control_id": call_control_id,
             "call_leg_id": data.get("call_leg_id"),
         }
+    except httpx.HTTPStatusError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -165,6 +187,8 @@ async def start_todo_call(request: TodoCallRequest, client: TelnyxClientDep):
             "call_control_id": call_control_id,
             "call_leg_id": data.get("call_leg_id"),
         }
+    except httpx.HTTPStatusError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

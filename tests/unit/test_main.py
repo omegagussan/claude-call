@@ -51,3 +51,6 @@ def test_openapi_documents_default_500_response_on_every_operation():
     assert error_schema["required"] == ["detail"]
     assert "201" in schema["paths"]["/calls/froken-ur"]["post"]["responses"]
     assert "422" in schema["paths"]["/calls/froken-ur"]["post"]["responses"]
+    assert schema["paths"]["/calls/froken-ur"]["post"]["responses"]["502"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ProviderErrorResponse"
+    }

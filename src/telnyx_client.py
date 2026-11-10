@@ -9,6 +9,24 @@ from src.config import get_worker_setting, settings
 logger = logging.getLogger(__name__)
 
 
+def provider_error_codes(response: httpx.Response) -> list[str]:
+    try:
+        data = response.json()
+    except ValueError:
+        return []
+    if not isinstance(data, dict) or not isinstance(data.get("errors"), list):
+        return []
+    return [
+        str(error["code"])
+        for error in data["errors"]
+        if isinstance(error, dict)
+        and isinstance(error.get("code"), (str, int))
+        and str(error["code"]).isascii()
+        and str(error["code"]).isdigit()
+        and len(str(error["code"])) <= 12
+    ]
+
+
 class TelnyxClient:
     async def _post(self, path: str, body: dict[str, Any], action: str) -> dict[str, Any]:
         logger.info("telnyx_request", extra={"action": action})
@@ -20,24 +38,13 @@ class TelnyxClient:
             raise
 
         if response.is_error:
-            codes: list[str] = []
-            try:
-                data = response.json()
-            except ValueError:
-                data = None
-            if isinstance(data, dict) and isinstance(data.get("errors"), list):
-                codes = [
-                    str(error["code"])
-                    for error in data["errors"]
-                    if isinstance(error, dict)
-                    and isinstance(error.get("code"), (str, int))
-                    and str(error["code"]).isascii()
-                    and str(error["code"]).isdigit()
-                    and len(str(error["code"])) <= 12
-                ]
             logger.error(
                 "telnyx_rejected",
-                extra={"action": action, "status_code": response.status_code, "provider_error_codes": codes},
+                extra={
+                    "action": action,
+                    "status_code": response.status_code,
+                    "provider_error_codes": provider_error_codes(response),
+                },
             )
         response.raise_for_status()
         result: dict[str, Any] = response.json()

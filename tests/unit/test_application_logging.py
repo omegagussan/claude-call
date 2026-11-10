@@ -35,8 +35,9 @@ def test_logging_setup_is_idempotent_and_streams_json(application_output):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["/calls/dial", "/calls/froken-ur", "/calls/todo"])
 @respx.mock
-async def test_provider_rejection_logs_status_and_codes_without_sensitive_data(application_output):
+async def test_provider_rejection_logs_status_and_codes_without_sensitive_data(application_output, endpoint):
     respx.post("https://api.telnyx.com/v2/calls").respond(
         403,
         json={
@@ -48,16 +49,39 @@ async def test_provider_rejection_logs_status_and_codes_without_sensitive_data(a
     )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
-            "/calls/froken-ur",
+            endpoint,
             json={"to_number": {"country_code": "+46", "area_code": "8", "subscriber_number": "12345678"}},
         )
-    assert response.status_code == 500
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "Telnyx rejected the request",
+        "provider": "telnyx",
+        "provider_status": 403,
+        "provider_error_codes": ["10010"],
+    }
     rejection = next(record for record in records(application_output) if record["message"] == "telnyx_rejected")
     assert rejection["status_code"] == 403
     assert rejection["provider_error_codes"] == ["10010"]
     text = application_output.getvalue()
     for private in ("+46812345678", "private provider detail", "private-value", "Authorization"):
         assert private not in text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_status", [401, 429, 500])
+@respx.mock
+async def test_non_json_provider_errors_remain_distinct_from_api_auth(provider_status, application_output):
+    respx.post("https://api.telnyx.com/v2/calls").respond(provider_status, text="private upstream body")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/calls/dial",
+            json={"to_number": {"country_code": "+46", "area_code": "8", "subscriber_number": "12345678"}},
+        )
+    assert response.status_code == 502
+    assert response.json()["provider_status"] == provider_status
+    assert response.json()["provider_error_codes"] == []
+    assert "private upstream body" not in response.text
+    assert "private upstream body" not in application_output.getvalue()
 
 
 @pytest.mark.asyncio
